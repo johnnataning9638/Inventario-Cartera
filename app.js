@@ -25,6 +25,66 @@ const OBLIGATION_TYPES=[
   "SANCION","PRODUCTOS ULTRAPROCESADOS","PRODUCTOS PLASTICOS","SIMPLE","OTROS"
 ];
 const STATUS_TYPES=["TERMINADO","EN PROCESO","PENDIENTE POR GESTIÓN","EN GESTIÓN","EMBARGADO","DESEMBARGADO"];
+
+function isoFromDateInput(value){
+  const raw=String(value??"").trim();
+  if(!raw)return "";
+  const d=raw.replace(/\D/g,"");
+  let day,month,year;
+  if(d.length===6){day=d.slice(0,2);month=d.slice(2,4);year="20"+d.slice(4,6);}
+  else if(d.length===8){day=d.slice(0,2);month=d.slice(2,4);year=d.slice(4,8);}
+  else return "";
+  const dt=new Date(Number(year),Number(month)-1,Number(day));
+  if(dt.getFullYear()!==Number(year)||dt.getMonth()!==Number(month)-1||dt.getDate()!==Number(day))return "";
+  return year+"-"+String(month).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+}
+function displayDate(value){
+  const iso=String(value??"").slice(0,10);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(iso)){
+    const [y,m,d]=iso.split("-");
+    return d+"/"+m+"/"+y;
+  }
+  return String(value??"");
+}
+function formatDateTyping(value){
+  const digits=String(value??"").replace(/\D/g,"").slice(0,8);
+  if(digits.length<=2)return digits;
+  if(digits.length<=4)return digits.slice(0,2)+"/"+digits.slice(2);
+  if(digits.length===6)return digits.slice(0,2)+"/"+digits.slice(2,4)+"/20"+digits.slice(4);
+  return digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4,8);
+}
+function bindDateFields(root){
+  root.querySelectorAll(".date-field").forEach(input=>{
+    const picker=input.parentElement.querySelector(".date-picker");
+    const syncFromText=()=>{
+      const raw=input.value.trim();
+      if(!raw){if(picker)picker.value="";return;}
+      const iso=isoFromDateInput(raw);
+      if(!iso){input.setCustomValidity("FECHA NO VÁLIDA. USE DD-MM-AA O DD-MM-AAAA.");return;}
+      input.setCustomValidity("");
+      input.value=displayDate(iso);
+      if(picker)picker.value=iso;
+    };
+    input.addEventListener("input",()=>{
+      input.value=formatDateTyping(input.value);
+      if(picker){
+        const iso=isoFromDateInput(input.value);
+        if(iso)picker.value=iso;
+      }
+      input.setCustomValidity("");
+    });
+    input.addEventListener("blur",syncFromText);
+    if(picker)picker.addEventListener("change",()=>{
+      input.value=displayDate(picker.value);
+      input.setCustomValidity("");
+    });
+    if(input.value)input.value=displayDate(input.value);
+    if(picker){
+      const iso=isoFromDateInput(input.value);
+      if(iso)picker.value=iso;
+    }
+  });
+}
 const contrib=id=>cache.contribuyentes.find(x=>Number(x.id)===Number(id));
 const exped=id=>cache.expedientes.find(x=>Number(x.id)===Number(id));
 const person=id=>{const c=contrib(id);return c?'<div class="person">'+esc(c.razon_social)+'</div><div class="nit">NIT '+esc(c.nit)+'</div>':'<span class="muted">SIN CONTRIBUYENTE</span>'};
@@ -163,6 +223,7 @@ function fieldHtml(f,r){
    return '<label>'+label+'<select name="'+key+'"><option value="">SELECCIONAR...</option>'+STATUS_TYPES.map(x=>'<option value="'+esc(x)+'" '+(current===x?"selected":"")+'>'+esc(x)+'</option>').join("")+extra+'</select></label>';
  }
  if(type==="currency")return '<label>'+label+'<input name="'+key+'" class="money-field" type="text" inputmode="numeric" value="'+esc(moneyInput(val))+'" placeholder="$ 0"></label>';
+ if(type==="date")return '<label>'+label+'<div class="date-control"><input name="'+key+'" class="date-field" type="text" inputmode="numeric" maxlength="10" value="'+esc(displayDate(val))+'" placeholder="DD-MM-AA"><input class="date-picker" type="date" value="'+esc(String(val??"").slice(0,10))+'" aria-label="CALENDARIO '+esc(label)+'" title="ABRIR CALENDARIO"></div></label>';
  if(type==="nit"||type==="social")return '<label>'+label+'<input name="'+key+'" class="upper-field" type="text" value="'+esc(val)+'" '+(type==="nit"?'inputmode="numeric"':'')+' required></label>';
  if(type==="textarea")return '<label>'+label+'<textarea name="'+key+'" class="upper-field">'+esc(val)+'</textarea></label>';
  return '<label>'+label+'<input name="'+key+'" class="upper-field" type="'+(type||"text")+'" value="'+esc(val)+'"></label>';
@@ -216,6 +277,7 @@ function openModal(type,id){
  }
  $("mtitle").textContent=(id?"EDITAR ":"NUEVO ")+d.title;
  $("mform").innerHTML='<div class="formgrid">'+d.fields.map(f=>fieldHtml(f,formRecord)).join("")+'</div><button class="save">GUARDAR</button>';
+ bindDateFields($("mform"));
  $("mform").querySelectorAll(".upper-field").forEach(el=>el.addEventListener("input",()=>{
    const pos=el.selectionStart;el.value=el.value.toUpperCase();try{el.setSelectionRange(pos,pos)}catch{}
  }));
@@ -235,6 +297,7 @@ function openModal(type,id){
     for(const f of d.fields){
       const k=f[0],type=f[2];
       if(type==="currency"&&o[k]!==null)o[k]=parseMoney(o[k]);
+      else if(type==="date"&&o[k]){const iso=isoFromDateInput(o[k]);if(!iso){alert("FECHA NO VÁLIDA EN "+f[1]+". USE DD-MM-AA O DD-MM-AAAA.");return;}o[k]=iso;}
       else if(!["date","contrib","exped","nit","social"].includes(type))o[k]=upper(o[k]);
     }
     if(type==="titulos"){const c=contrib(o.contribuyente_id);o.nit=c?.nit||null;o.contribuyente=c?.razon_social||null}
@@ -288,6 +351,7 @@ function importXlsx(type){
    if(type==="pagos"){const c=contrib(o.contribuyente_id);o.nit=c?.nit||row.NIT||null;o.razon_social=c?.razon_social||row.RAZON_SOCIAL||null}
    for(const fld of d.fields){
      if(fld[2]==="currency"&&o[fld[0]]!==null)o[fld[0]]=parseMoney(o[fld[0]]);
+     else if(fld[2]==="date"&&o[fld[0]]){const raw=o[fld[0]];const iso=typeof raw==="number"?new Date(Math.round((raw-25569)*86400000)).toISOString().slice(0,10):isoFromDateInput(raw)||String(raw).slice(0,10);o[fld[0]]=iso;}
      else if(!["date","contrib","exped","nit","social"].includes(fld[2]))o[fld[0]]=upper(o[fld[0]]);
    }
    const r=await db.from(d.table).insert(o);
