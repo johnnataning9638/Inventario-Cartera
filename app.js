@@ -1,7 +1,7 @@
 const {createClient}=supabase;
 const SB_URL="https://ulismfqyxnujkwvjjmcp.supabase.co";
 const SB_KEY="sb_publishable_WMk7vHWlDfdW2aegoFtHSA_9Zq0l_r-";
-const db=createClient(SB_URL,SB_KEY,{auth:{autoRefreshToken:true,persistSession:false,detectSessionInUrl:true}});
+const db=createClient(SB_URL,SB_KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true,flowType:"pkce"}});
 let currentUser=null,view="inicio";
 let cache={contribuyentes:[],expedientes:[],titulos:[],pagos:[],actuaciones:[],embargos:[]};
 const tableState={
@@ -133,8 +133,11 @@ async function login(e){
    return setMsg(m.includes("invalid login credentials")?"CORREO O CONTRASEÑA INCORRECTOS":r.error.message,true);
  }
  try{
-   await ensureAccess(r.data.user);
-   currentUser=r.data.user;
+   const user=r.data.user;
+   const session=r.data.session;
+   if(!user||!session)throw Error("NO SE RECIBIÓ UNA SESIÓN VÁLIDA");
+   await ensureAccess(user);
+   currentUser=user;
    await load();
    $("auth").classList.add("hidden");
    $("app").classList.remove("hidden");
@@ -143,7 +146,8 @@ async function login(e){
  }catch(x){
    console.error(x);
    setMsg(x.message||"NO FUE POSIBLE CARGAR EL INVENTARIO",true);
-   await db.auth.signOut();
+   // Solo cerrar sesión cuando el inicio realmente falló; evita ciclos de entrada/salida por eventos de autenticación.
+   try{await db.auth.signOut({scope:"local"});}catch{}
  }
 }
 
@@ -608,8 +612,10 @@ async function bootAuth(){
    setMsg(e.message||"NO FUE POSIBLE VALIDAR EL ACCESO",true);
  }
 }
-db.auth.onAuthStateChange((event)=>{
- if(event==="SIGNED_OUT"){
+db.auth.onAuthStateChange((event,session)=>{
+ // No desmontar la aplicación por eventos intermedios de autenticación.
+ // Solo SIGNED_OUT sin sesión confirma que el usuario cerró sesión.
+ if(event==="SIGNED_OUT" && !session){
    currentUser=null;
    $("app").classList.add("hidden");
    $("auth").classList.remove("hidden");
