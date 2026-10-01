@@ -33,7 +33,7 @@ const OBLIGATION_TYPES=[
 const STATUS_TYPES=["TERMINADO","EN PROCESO","PENDIENTE POR GESTIÓN","EN GESTIÓN","EMBARGADO","DESEMBARGADO"];
 const EXPEDIENTE_STATUS=["AVISO DE COBRO","OPP","EMBARGO","DESEMBARGO","INVESTIGACIÓN DE BIENES","MANDAMIENTO DE PAGO"];
 const TITULO_STATUS=["ENDOSADO","APLICADO","SIN AUTORIZACION","AUTORIZADO","PDTE ENDOSAR","PDTE FRACCIONAR","SOLICITUD AUTORIZACION","FONDO DE GESTION","COACTIVA","FRACCIONADO","PDTE APLICAR","PROCESO DE AUTORIZACIÓN","DEVUELTO"];
-const PAGO_STATUS=["PENDIENTE","APLICADO","EN PROCESO","TERMINADO","DEVUELTO"];
+const PAGO_STATUS=["APLICADO","NO SE REFLEJA","REPROCESAR"];
 const ACTUACION_STATUS=["PENDIENTE","EN PROCESO","TERMINADO","FINALIZADO"];
 const EXPEDIENTE_GESTION=["PENDIENTE","EN PROCESO","TERMINADO","DEVUELTO"];
 
@@ -273,6 +273,13 @@ function inlineStatus(type,r){
 }
 function inlineGestion(r){
  return '<select class="inline-status gestion-status" data-status-type="expedientes-gestion" data-status-id="'+r.id+'" onchange="updateInlineGestion('+r.id+',this.value,this)">'+gestionOptions(r.gestion)+'</select>';
+}
+function obligationOptions(current){
+ const cur=upper(current||"");
+ return '<option value="">SELECCIONAR...</option>'+OBLIGATION_TYPES.map(x=>'<option value="'+esc(x)+'" '+(cur===x?"selected":"")+'>'+esc(x)+'</option>').join("")+(cur&&!OBLIGATION_TYPES.includes(cur)?'<option value="'+esc(cur)+'" selected>'+esc(cur)+' (ACTUAL)</option>':"");
+}
+function inlineObligation(type,r){
+ return '<select class="inline-status obligation-status" data-field="tipo_obligacion" data-status-type="'+type+'" data-status-id="'+r.id+'" onchange="updateInlineField(\''+type+'\','+r.id+',\'tipo_obligacion\',this.value,this)">'+obligationOptions(r.tipo_obligacion)+'</select>';
 }
 function inlineDate(r,key){
  const value=String(r[key]||"").slice(0,10);
