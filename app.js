@@ -97,7 +97,7 @@ function bindDateFields(root){
   });
 }
 const contrib=id=>cache.contribuyentes.find(x=>Number(x.id)===Number(id));
-// Adaptador único para las tablas: separa NIT y razón social sin alterar el modelo de datos.\nfunction contributorData(id){const c=contrib(id);return c?{nit:c.nit||"",razon:c.razon_social||""}:{nit:"",razon:""};}
+// Adaptador único para las tablas: separa NIT y razón social sin alterar el modelo de datos.\nfunction contributorData(id,record){const c=contrib(id);return {nit:String(record?.nit||c?.nit||""),razon:String(record?.razon_social||record?.contribuyente||c?.razon_social||"")};}
 const exped=id=>cache.expedientes.find(x=>Number(x.id)===Number(id));
 const person=id=>{const c=contrib(id);return c?'<div class="person">'+esc(c.razon_social)+'</div><div class="nit">NIT '+esc(c.nit)+'</div>':'<span class="muted">SIN CONTRIBUYENTE</span>'};
 const status=v=>{const s=String(v||"SIN ESTADO").toUpperCase();let c="gray";if(/TERMIN|APLICADO|CERRAD|ENDOSAD/.test(s))c="green";else if(/GESTIÓN|PENDIENTE|INVESTIG/.test(s))c="blue";else if(/PRÓXIMO|ENLOSAD/.test(s))c="amber";else if(/EMBARG|VENC/.test(s))c="red";return '<span class="badge '+c+'">'+esc(s)+'</span>'};
@@ -198,7 +198,7 @@ function home(){
  try{
    const q=String($("search").value||"").trim().toLowerCase();
    let rows=Array.isArray(cache.expedientes)?[...cache.expedientes]:[];
-   if(q)rows=rows.filter(r=>{const c=contributorData(r.contribuyente_id);return [c.nit,c.razon,r.expediente,r.tipo_obligacion,r.estado,r.gestion].some(v=>String(v||"").toLowerCase().includes(q));});
+   if(q)rows=rows.filter(r=>{const c=contributorData(r.contribuyente_id,r);return [c.nit,c.razon,r.expediente,r.tipo_obligacion,r.estado,r.gestion].some(v=>String(v||"").toLowerCase().includes(q));});
    rows=sortRows("expedientes",rows);
    const c=cache,total=c.expedientes.reduce((s,x)=>s+Number(x.cuantia||0),0);
    const body=rows.map(r=>{const cd=contributorData(r.contribuyente_id);return '<tr><td>'+esc(cd.nit||"—")+'</td><td>'+esc(cd.razon||"—")+'</td><td>'+esc(r.expediente||"—")+'</td><td>'+money(r.cuantia)+'</td><td>'+inlineObligation("expedientes",r)+'</td><td>'+inlineStatus("expedientes",r)+'</td><td>'+inlineGestion(r)+'</td><td>'+inlineDate("expedientes",r,"fecha_aviso_cobro")+'</td><td>'+inlineDate("expedientes",r,"fecha_opp")+'</td><td>'+inlineDate("expedientes",r,"fecha_embargo")+'</td><td>'+inlineDate("expedientes",r,"fecha_desembargo")+'</td><td>'+inlineDate("expedientes",r,"fecha_investigacion_bienes")+'</td><td>'+inlineDate("expedientes",r,"fecha_mandamiento_pago")+'</td></tr>';}).join("");
@@ -668,7 +668,7 @@ function consolidatedHome(q){
  let rows=cache.expedientes.filter(e=>ids.has(e.id));
  rows=sortRows("expedientes",filterRows("expedientes",rows));
  const body=rows.map(e=>{
-   const c=contributorData(e.contribuyente_id),ts=cache.titulos.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id),ps=cache.pagos.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id),as=cache.actuaciones.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id);
+   const c=contributorData(e.contribuyente_id,e),ts=cache.titulos.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id),ps=cache.pagos.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id),as=cache.actuaciones.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id);
    const obs=[e.observaciones,...ts.map(x=>x.observaciones),...ps.map(x=>x.observaciones),...as.map(x=>x.descripcion)].filter(Boolean).join(" | ");
    const titStates=ts.map(x=>upper(x.estado)).filter(Boolean).join(" · "),pagosTotal=ps.reduce((s,x)=>s+Number(x.valor||0),0),acts=as.map(x=>upper(x.tipo)).filter(Boolean).join(" · ");
    return '<tr><td>'+esc(c.nit||"")+'</td><td>'+esc(c.razon||"")+'</td><td>'+esc(e.expediente||"")+'</td><td>'+esc(e.tipo_obligacion||"—")+'</td><td>'+money(e.cuantia)+'</td><td>'+inlineStatus("expedientes",e)+'</td><td>'+inlineDate("expedientes",e,"fecha_aviso_cobro")+'</td><td>'+inlineDate("expedientes",e,"fecha_opp")+'</td><td>'+inlineDate("expedientes",e,"fecha_embargo")+'</td><td>'+inlineDate("expedientes",e,"fecha_desembargo")+'</td><td>'+inlineDate("expedientes",e,"fecha_investigacion_bienes")+'</td><td>'+inlineDate("expedientes",e,"fecha_mandamiento_pago")+'</td><td>'+esc(titStates||"—")+'</td><td>'+money(pagosTotal)+'</td><td>'+esc(acts||"—")+'</td><td class="observation-cell">'+esc(obs||"—")+'</td></tr>';
