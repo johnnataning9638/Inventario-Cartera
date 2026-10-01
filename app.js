@@ -95,11 +95,30 @@ function home(){
 }
 
 function reports(){
- const e=cache.expedientes,p=cache.pagos,t=cache.titulos,a=cache.actuaciones;
- const emb=cache.embargos.filter(x=>String(x.estado||"").toUpperCase()==="ACTIVO").length;
- const total=e.reduce((s,x)=>s+Number(x.cuantia||0),0),pag=p.reduce((s,x)=>s+Number(x.valor||0),0);
- const estados={};e.forEach(x=>{const k=x.estado||"SIN ESTADO";estados[k]=(estados[k]||0)+1});
- $("content").innerHTML='<div class="report-grid"><div class="report-card"><h3>VALOR TOTAL DE CARTERA</h3><strong>'+money(total)+'</strong><p class="muted">SUMA DE CUANTÍAS DE EXPEDIENTES</p></div><div class="report-card"><h3>PAGOS REGISTRADOS</h3><strong>'+money(pag)+'</strong><p class="muted">'+p.length+' REGISTROS</p></div><div class="report-card"><h3>TÍTULOS / TDJ</h3><strong>'+t.length+'</strong><p class="muted">TÍTULOS REGISTRADOS</p></div><div class="report-card"><h3>EMBARGOS ACTIVOS</h3><strong>'+emb+'</strong><p class="muted">SEGUIMIENTO DE MEDIDAS</p></div><div class="report-card"><h3>ACTUACIONES</h3><strong>'+a.length+'</strong><p class="muted">GESTIONES REGISTRADAS</p></div><div class="report-card"><h3>ESTADOS DE CARTERA</h3><strong>'+Object.keys(estados).length+'</strong><p class="muted">'+Object.entries(estados).map(([k,v])=>esc(k)+": "+v).join(" · ")+'</p></div></div>';
+  const e=cache.expedientes,p=cache.pagos,t=cache.titulos,a=cache.actuaciones;
+  const embAct=cache.embargos.filter(x=>String(x.estado||"").toUpperCase()==="ACTIVO").length;
+  const embTotal=cache.embargos.length;
+  const total=e.reduce((s,x)=>s+Number(x.cuantia||0),0),pag=p.reduce((s,x)=>s+Number(x.valor||0),0);
+  const estados={};e.forEach(x=>{const k=String(x.estado||"SIN ESTADO").toUpperCase();estados[k]=(estados[k]||0)+1});
+  const titAplic=t.filter(x=>String(x.estado||"").toUpperCase()==="APLICADO").length;
+  const titPend=t.filter(x=>String(x.estado||"").toUpperCase()==="PENDIENTE").length;
+  const endosados=e.filter(x=>String(x.estado||"").toUpperCase()==="ENDOSADO").length;
+  const terminados=e.filter(x=>/TERMINAD|CERRAD/.test(String(x.estado||"").toUpperCase())).length;
+  const pendientes=e.filter(x=>/PENDIENTE/.test(String(x.estado||"").toUpperCase())).length;
+  const gestionados=Math.max(0,e.length-pendientes);
+  const pct=(n,d)=>d?Math.round(n*1000/d)/10:0;
+  const donut=(title,a,b,labelA,labelB)=>{
+    const total2=a+b, pa=pct(a,total2), deg=Math.round(pa*3.6);
+    return '<div class="chart-card"><div class="chart-head"><h3>'+title+'</h3><span>'+pa+'% '+labelA+'</span></div><div class="donut-row"><div class="donut" style="--p:'+deg+'deg"><div class="donut-hole"><b>'+pa+'%</b><small>'+labelA+'</small></div></div><div class="legend"><div><i class="dot primary"></i><b>'+labelA+'</b><span>'+a+'</span></div><div><i class="dot secondary"></i><b>'+labelB+'</b><span>'+b+'</span></div></div></div></div>';
+  };
+  const bar=(label,value,max)=>'<div class="bar-item"><div><span>'+esc(label)+'</span><b>'+value+'</b></div><div class="bar-track"><span style="width:'+pct(value,max)+'%"></span></div></div>';
+  const maxState=Math.max(1,...Object.values(estados));
+  const stateBars=Object.entries(estados).sort((x,y)=>y[1]-x[1]).map(([k,v])=>bar(k,v,maxState)).join('');
+  const types={};a.forEach(x=>{const k=String(x.tipo||"SIN TIPO").toUpperCase();types[k]=(types[k]||0)+1});
+  const maxType=Math.max(1,...Object.values(types));
+  const typeBars=Object.entries(types).sort((x,y)=>y[1]-x[1]).slice(0,8).map(([k,v])=>bar(k,v,maxType)).join('');
+  const recPct=pct(pag,total);
+  $("content").innerHTML='<div class="report-grid"><div class="report-card"><h3>VALOR TOTAL DE CARTERA</h3><strong>'+money(total)+'</strong><p class="muted">SUMA DE CUANTÍAS DE EXPEDIENTES</p></div><div class="report-card"><h3>PAGOS REGISTRADOS</h3><strong>'+money(pag)+'</strong><p class="muted">'+p.length+' REGISTROS</p></div><div class="report-card"><h3>TÍTULOS / TDJ</h3><strong>'+t.length+'</strong><p class="muted">TÍTULOS REGISTRADOS</p></div><div class="report-card"><h3>EMBARGOS ACTIVOS</h3><strong>'+embAct+'</strong><p class="muted">'+embTotal+' MEDIDAS REGISTRADAS</p></div><div class="report-card"><h3>ACTUACIONES</h3><strong>'+a.length+'</strong><p class="muted">GESTIONES REGISTRADAS</p></div><div class="report-card"><h3>ESTADOS DE CARTERA</h3><strong>'+Object.keys(estados).length+'</strong><p class="muted">'+Object.entries(estados).map(([k,v])=>esc(k)+": "+v).join(" · ")+'</p></div></div><div class="indicator-section"><div class="indicator-title"><div><span>INDICADORES DE GESTIÓN</span><h3>LECTURA RÁPIDA DE LA CARTERA</h3></div><small>ACTUALIZADO CON LOS REGISTROS DISPONIBLES</small></div><div class="charts-grid">'+donut('EMBARGOS: ACTIVOS VS DESEMBARGADOS',embAct,Math.max(0,embTotal-embAct),'ACTIVOS','DESEMBARGADOS')+donut('EXPEDIENTES: GESTIONADOS VS PENDIENTES',gestionados,pendientes,'GESTIONADOS','PENDIENTES')+donut('EXPEDIENTES: TERMINADOS VS PENDIENTES',terminados,Math.max(0,e.length-terminados),'TERMINADOS','NO TERMINADOS')+donut('TÍTULOS: APLICADOS VS PENDIENTES',titAplic,titPend,'APLICADOS','PENDIENTES')+donut('EXPEDIENTES: ENDOSADOS VS RESTANTES',endosados,Math.max(0,e.length-endosados),'ENDOSADOS','RESTANTES')+'<div class="chart-card"><div class="chart-head"><h3>RECAUDO SOBRE CARTERA</h3><span>'+recPct+'%</span></div><div class="metric-progress"><div class="progress-track"><span style="width:'+Math.min(100,recPct)+'%"></span></div><div><b>'+money(pag)+'</b><small>DE '+money(total)+'</small></div></div><p class="chart-note">PORCENTAJE CALCULADO COMO PAGOS REGISTRADOS / VALOR TOTAL DE CARTERA.</p></div><div class="chart-card wide"><div class="chart-head"><h3>DISTRIBUCIÓN DE EXPEDIENTES POR ESTADO</h3><span>'+e.length+' EXPEDIENTES</span></div><div class="bars">'+stateBars+'</div></div><div class="chart-card wide"><div class="chart-head"><h3>ACTUACIONES POR TIPO</h3><span>'+a.length+' ACTUACIONES</span></div><div class="bars">'+typeBars+'</div></div></div></div>';
 }
 
 const defs={
