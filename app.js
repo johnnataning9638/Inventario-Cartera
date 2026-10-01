@@ -190,8 +190,23 @@ function render(){
 }
 
 function home(){
- const c=cache,total=c.expedientes.reduce((s,x)=>s+Number(x.cuantia||0),0);
- $("content").innerHTML='<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>CONSULTA NIT, RAZÓN SOCIAL O EXPEDIENTE. CADA REGISTRO ESTÁ RELACIONADO CON SU CONTRIBUYENTE PARA FACILITAR EL SEGUIMIENTO.</p></div><div class="card-body" style="margin-top:16px"><h3 class="section-title">ESTADO GENERAL</h3><div class="grid">'+["EN GESTIÓN","EMBARGADO","PRÓXIMO A PRESCRIBIR","TERMINADO"].map(s=>'<div class="stat">'+status(s)+'<b>'+c.expedientes.filter(x=>String(x.estado||"").toUpperCase()===s).length+'</b></div>').join("")+'</div></div>';
+ try{
+   const q=String($("search").value||"").trim().toLowerCase();
+   let rows=Array.isArray(cache.expedientes)?[...cache.expedientes]:[];
+   if(q)rows=rows.filter(r=>{const c=contributorData(r.contribuyente_id);return [c.nit,c.razon,r.expediente,r.tipo_obligacion,r.estado,r.gestion].some(v=>String(v||"").toLowerCase().includes(q));});
+   rows=sortRows("expedientes",rows);
+   const c=cache,total=c.expedientes.reduce((s,x)=>s+Number(x.cuantia||0),0);
+   const body=rows.map(r=>{const cd=contributorData(r.contribuyente_id);return '<tr><td>'+esc(cd.nit||"—")+'</td><td>'+esc(cd.razon||"—")+'</td><td>'+esc(r.expediente||"—")+'</td><td>'+money(r.cuantia)+'</td><td>'+inlineObligation("expedientes",r)+'</td><td>'+inlineStatus("expedientes",r)+'</td><td>'+inlineGestion(r)+'</td><td>'+inlineDate("expedientes",r,"fecha_aviso_cobro")+'</td><td>'+inlineDate("expedientes",r,"fecha_opp")+'</td><td>'+inlineDate("expedientes",r,"fecha_embargo")+'</td><td>'+inlineDate("expedientes",r,"fecha_desembargo")+'</td><td>'+inlineDate("expedientes",r,"fecha_investigacion_bienes")+'</td><td>'+inlineDate("expedientes",r,"fecha_mandamiento_pago")+'</td></tr>';}).join("");
+   const note=q?'<div class="filter-context"><b>BÚSQUEDA ACTIVA:</b> '+esc(q)+'<span>'+rows.length+' EXPEDIENTES</span></div>':"";
+   const headers=[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente","EXPEDIENTE"],["cuantia","CUANTÍA"],["tipo_obligacion","TIPO OBLIGACIÓN"],["estado","ESTADO"],["gestion","GESTIÓN"],["fecha_aviso_cobro","FECHA AVISO"],["fecha_opp","FECHA OPP"],["fecha_embargo","FECHA EMBARGO"],["fecha_desembargo","FECHA DESEMBARGO"],["fecha_investigacion_bienes","FECHA INVESTIGACIÓN"],["fecha_mandamiento_pago","FECHA MANDAMIENTO"]];
+   const head=headers.map(([k,h])=>sortHeader("expedientes",k,h)).join("");
+   $("content").innerHTML='<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>CONSULTA CONSOLIDADA POR NIT, RAZÓN SOCIAL Y EXPEDIENTE. LAS MODIFICACIONES SE REFLEJAN EN LAS PESTAÑAS RELACIONADAS.</p></div>'+note+'<div class="card-body consolidated-card" style="margin-top:16px"><div class="toolbar">'+filterOptions("expedientes")+'</div><div class="tablewrap"><table><thead><tr>'+head+'</tr></thead><tbody>'+(body||'<tr><td colspan="13" class="empty">NO HAY INFORMACIÓN PARA LA BÚSQUEDA</td></tr>')+'</tbody></table></div></div>';
+   bindInlineDateFields($("content"));
+ }catch(error){
+   console.error("ERROR INICIO",error);
+   const c=cache,total=(c.expedientes||[]).reduce((s,x)=>s+Number(x.cuantia||0),0);
+   $("content").innerHTML='<div class="grid"><div class="stat">EXPEDIENTES<b>'+((c.expedientes||[]).length)+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+((c.titulos||[]).length)+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+((c.pagos||[]).length)+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="card-body" style="margin-top:16px"><h3 class="section-title">INICIO</h3><p>DATOS CARGADOS. NO FUE POSIBLE GENERAR EL CONSOLIDADO; LAS PESTAÑAS DE GESTIÓN SIGUEN DISPONIBLES.</p></div>';
+ }
 }
 
 function reports(){
