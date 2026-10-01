@@ -201,3 +201,5 @@
 .consolidated-card .tablewrap th{position:sticky;top:0;z-index:1}
 .consolidated-card .tablewrap td{vertical-align:top}
 .tablewrap td .inline-status{margin:-3px 0}
+
+.inline-date{min-width:145px;padding:6px 8px;border:1px solid #c9dce8;border-radius:7px;background:#fafdff;color:#214e6d;font:inherit;font-size:10px;font-weight:700;cursor:pointer;outline:none}.inline-date:focus{border-color:#249bd5;box-shadow:0 0 0 3px #249bd51a}.inline-date:disabled{opacity:.65;cursor:wait}.gestion-status{min-width:150px}.tablewrap td{vertical-align:middle}.tablewrap td:has(.inline-date){min-width:155px}
