@@ -318,13 +318,15 @@ function bindInlineDateFields(root){
    const picker=input.parentElement.querySelector(".inline-date-picker");
    const sync=async()=>{
      const raw=input.value.trim();
-     if(!raw){await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,"",input);return;}
+     if(!raw){if(input.dataset.lastSaved==="")return;await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,"",input);input.dataset.lastSaved="";return;}
      const iso=isoFromDateInput(raw);
      if(!iso){input.setCustomValidity("FECHA NO VÁLIDA. USE DD-MM-AA.");return;}
      input.setCustomValidity("");
      input.value=displayDate(iso);
      if(picker)picker.value=iso;
-     await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,iso,input);
+     if(input.dataset.lastSaved===iso)return;
+     const ok=await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,iso,input);
+     if(ok!==false)input.dataset.lastSaved=iso;
    };
    input.addEventListener("input",()=>{
      input.value=formatDateTyping(input.value);
@@ -345,7 +347,8 @@ function bindInlineDateFields(root){
    input.addEventListener("blur",sync);
    if(picker)picker.addEventListener("change",async()=>{
      input.value=displayDate(picker.value);
-     await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,picker.value,input);
+     const ok=await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,picker.value,input);
+     if(ok!==false)input.dataset.lastSaved=picker.value;
    });
  });
  bindBulkFillShortcuts(root);
@@ -494,6 +497,33 @@ async function updateInlineGestion(id,value,selectEl){
  return updateInlineField("expedientes",id,"gestion",upper(value||""),selectEl);
 }
 
+async function syncWorkflowStatus(type,rec,next){
+ const target=upper(next||"");
+ const groups={pagos:cache.pagos,actuaciones:cache.actuaciones,titulos:cache.titulos};
+ if(type!=="expedientes")return;
+ const rel={};
+ for(const [t,rows] of Object.entries(groups)){
+   rel[t]=rows.filter(x=>(rec.expediente_id&&x.expediente_id&&Number(x.expediente_id)===Number(rec.expediente_id))||(rec.contribuyente_id&&x.contribuyente_id&&Number(x.contribuyente_id)===Number(rec.contribuyente_id)));
+ }
+ if(/TERMINAD|FINALIZAD/.test(target)){
+   const rules={pagos:"TERMINADO",actuaciones:"FINALIZADO",titulos:"APLICADO"};
+   for(const [t,statusValue] of Object.entries(rules)){
+     const ids=rel[t].map(x=>Number(x.id)).filter(Number.isFinite);
+     if(!ids.length)continue;
+     const rr=await db.rpc("cartera_bulk_update_field",{p_table:defs[t].table,p_ids:ids,p_column:"estado",p_value:statusValue});
+     if(rr.error)throw rr.error;
+     rel[t].forEach(x=>x.estado=statusValue);
+   }
+ }
+ if(target==="DEVUELTO"){
+   const ids=rel.actuaciones.map(x=>Number(x.id)).filter(Number.isFinite);
+   if(ids.length){
+     const rr=await db.rpc("cartera_bulk_update_field",{p_table:defs.actuaciones.table,p_ids:ids,p_column:"estado",p_value:"DEVUELTO"});
+     if(rr.error)throw rr.error;
+     rel.actuaciones.forEach(x=>x.estado="DEVUELTO");
+   }
+ }
+}
 async function syncRelatedField(type,rec,value){
  const target=upper(value||"");
  const groups={expedientes:cache.expedientes,titulos:cache.titulos,pagos:cache.pagos,actuaciones:cache.actuaciones};
