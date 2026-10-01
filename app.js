@@ -4,6 +4,12 @@ const SB_KEY="sb_publishable_WMk7vHWlDfdW2aegoFtHSA_9Zq0l_r-";
 const db=createClient(SB_URL,SB_KEY,{auth:{autoRefreshToken:true,persistSession:false,detectSessionInUrl:true}});
 let currentUser=null,view="inicio";
 let cache={contribuyentes:[],expedientes:[],titulos:[],pagos:[],actuaciones:[],embargos:[]};
+const tableState={
+ expedientes:{sortKey:null,asc:null,status:"",tipo:""},
+ titulos:{sortKey:null,asc:null,status:"",tipo:""},
+ pagos:{sortKey:null,asc:null,status:"",tipo:""},
+ actuaciones:{sortKey:null,asc:null,status:"",tipo:""}
+};
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
@@ -268,21 +274,106 @@ function inlineDate(r,key){
  return '<input class="inline-date" type="date" value="'+esc(value)+'" aria-label="EDITAR '+esc(key)+'" onchange="updateInlineDate('+r.id+',\''+key+'\',this.value,this)">';
 }
 function observationText(r){return esc(r.observaciones||r.descripcion||"—");}
+
+function inlineDate(type,r,key){
+ const value=String(r[key]||"").slice(0,10);
+ return '<div class="inline-date-control"><input class="inline-date-field" type="text" inputmode="numeric" maxlength="10" value="'+esc(displayDate(value))+'" placeholder="DD-MM-AA" data-date-type="'+type+'" data-date-id="'+r.id+'" data-date-key="'+key+'"><input class="inline-date-picker" type="date" value="'+esc(value)+'" aria-label="CALENDARIO '+esc(key)+'"></div>';
+}
+function bindInlineDateFields(root){
+ root.querySelectorAll(".inline-date-field").forEach(input=>{
+   const picker=input.parentElement.querySelector(".inline-date-picker");
+   const sync=async()=>{
+     const raw=input.value.trim();
+     if(!raw){await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,"",input);return;}
+     const iso=isoFromDateInput(raw);
+     if(!iso){input.setCustomValidity("FECHA NO VÁLIDA. USE DD-MM-AA.");return;}
+     input.setCustomValidity("");
+     input.value=displayDate(iso);
+     if(picker)picker.value=iso;
+     await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,iso,input);
+   };
+   input.addEventListener("input",()=>{
+     input.value=formatDateTyping(input.value);
+     const iso=isoFromDateInput(input.value);
+     if(iso&&picker)picker.value=iso;
+     input.setCustomValidity("");
+   });
+   input.addEventListener("blur",sync);
+   if(picker)picker.addEventListener("change",async()=>{
+     input.value=displayDate(picker.value);
+     await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,picker.value,input);
+   });
+ });
+}
+function sortHeader(type,key,label){
+ const st=tableState[type]||{};
+ const active=st.sortKey===key;
+ const arrow=active?(st.asc?" ↑":" ↓"):"";
+ return '<th><button class="sort-header '+(active?"active":"")+'" onclick="sortTable(\''+type+'\',\''+key+'\')">'+esc(label)+arrow+'</button></th>';
+}
+function sortTable(type,key){
+ const st=tableState[type]||{};
+ if(st.sortKey!==key){
+   st.sortKey=key;
+   st.asc=(key==="cuantia"||key==="valor"||key.startsWith("fecha_")||["fecha","fecha_proxima","fecha_tdj","fecha_tramite","fecha_pago"].includes(key))?false:true;
+   if(key==="nit")st.asc=true;
+ }else st.asc=!st.asc;
+ render();
+}
+function sortValue(type,row,key){
+ if(key==="nit"){const c=contrib(row.contribuyente_id);return Number(String(c?.nit||"").replace(/\D/g,""))||0;}
+ if(key==="razon_social"){const c=contrib(row.contribuyente_id);return String(c?.razon_social||row.razon_social||"").toUpperCase();}
+ if(["cuantia","valor"].includes(key))return Number(row[key]||0);
+ if(["fecha","fecha_proxima","fecha_tdj","fecha_tramite","fecha_pago","fecha_aviso_cobro","fecha_opp","fecha_embargo","fecha_desembargo","fecha_investigacion_bienes","fecha_mandamiento_pago"].includes(key))return row[key]?new Date(row[key]+"T00:00:00").getTime():-Infinity;
+ return String(row[key]??"").toUpperCase();
+}
+function sortRows(type,rows){
+ const st=tableState[type];
+ if(!st?.sortKey)return rows;
+ const out=[...rows];
+ out.sort((a,b)=>{
+   const av=sortValue(type,a,st.sortKey),bv=sortValue(type,b,st.sortKey);
+   if(typeof av==="number"&&typeof bv==="number")return st.asc?av-bv:bv-av;
+   return st.asc?String(av).localeCompare(String(bv),"es"):String(bv).localeCompare(String(av),"es");
+ });
+ return out;
+}
+function filterOptions(type){
+ const st=tableState[type]||{};
+ const list=type==="expedientes"?EXPEDIENTE_STATUS:type==="titulos"?TITULO_STATUS:type==="pagos"?PAGO_STATUS:ACTUACION_STATUS;
+ const statusSelect='<select class="table-filter" onchange="setTableFilter(\''+type+'\',\'status\',this.value)"><option value="">TODOS LOS ESTADOS</option>'+list.map(x=>'<option value="'+esc(x)+'" '+(st.status===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>';
+ const typeSelect=type==="actuaciones"?'<select class="table-filter" onchange="setTableFilter(\'actuaciones\',\'tipo\',this.value)"><option value="">TODOS LOS TIPOS DE ACTUACIÓN</option>'+[...new Set(cache.actuaciones.map(x=>upper(x.tipo)).filter(Boolean))].sort().map(x=>'<option value="'+esc(x)+'" '+(st.tipo===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>':"";
+ return statusSelect+typeSelect;
+}
+function setTableFilter(type,key,value){tableState[type][key]=upper(value||"");render();}
+function filterRows(type,rows){
+ const st=tableState[type]||{};
+ return rows.filter(r=>{
+   if(st.status&&upper(r.estado)!==st.status)return false;
+   if(type==="actuaciones"&&st.tipo&&upper(r.tipo)!==st.tipo)return false;
+   return true;
+ });
+}
 function rowData(type,r){
- if(type==="expedientes")return [person(r.contribuyente_id),esc(r.expediente),money(r.cuantia),esc(r.tipo_obligacion||"—"),inlineStatus(type,r),inlineGestion(r),inlineDate(r,"fecha_aviso_cobro"),inlineDate(r,"fecha_opp"),inlineDate(r,"fecha_embargo"),inlineDate(r,"fecha_desembargo"),inlineDate(r,"fecha_investigacion_bienes"),inlineDate(r,"fecha_mandamiento_pago")];
- if(type==="titulos")return [person(r.contribuyente_id),esc(r.tdj),displayDate(r.fecha_tdj)||"—",money(r.valor),esc(r.tipo_obligacion||"—"),inlineStatus(type,r),esc(r.solicitud_radicado||"—"),displayDate(r.fecha_tramite)||"—"];
- if(type==="pagos"){const e=exped(r.expediente_id);return [person(r.contribuyente_id),esc(e?.expediente||"—"),esc(r.recibo||"—"),displayDate(r.fecha_pago)||"—",money(r.valor),esc(r.tipo_obligacion||"—"),inlineStatus(type,r),esc(r.tipo_pago||"—"),esc(r.aplicacion||"—")];}
- return [person(r.contribuyente_id),esc(exped(r.expediente_id)?.expediente||"—"),displayDate(r.fecha)||"—",esc(r.tipo_obligacion||"—"),esc(r.tipo||"—"),inlineStatus(type,r),displayDate(r.fecha_proxima)||"—"];
+ const c=contributorData(r.contribuyente_id);
+ if(type==="expedientes")return [esc(c.nit||"—"),esc(c.razon||"—"),esc(r.expediente),money(r.cuantia),esc(r.tipo_obligacion||"—"),inlineStatus(type,r),inlineGestion(r),inlineDate(type,r,"fecha_aviso_cobro"),inlineDate(type,r,"fecha_opp"),inlineDate(type,r,"fecha_embargo"),inlineDate(type,r,"fecha_desembargo"),inlineDate(type,r,"fecha_investigacion_bienes"),inlineDate(type,r,"fecha_mandamiento_pago")];
+ if(type==="titulos")return [esc(c.nit||"—"),esc(c.razon||"—"),esc(r.tdj),inlineDate(type,r,"fecha_tdj"),money(r.valor),esc(r.tipo_obligacion||"—"),inlineStatus(type,r),esc(r.solicitud_radicado||"—"),inlineDate(type,r,"fecha_tramite")];
+ if(type==="pagos"){const e=exped(r.expediente_id);return [esc(c.nit||"—"),esc(c.razon||"—"),esc(e?.expediente||"—"),esc(r.recibo||"—"),inlineDate(type,r,"fecha_pago"),money(r.valor),esc(r.tipo_obligacion||"—"),inlineStatus(type,r),esc(r.tipo_pago||"—"),esc(r.aplicacion||"—")];}
+ return [esc(c.nit||"—"),esc(c.razon||"—"),esc(exped(r.expediente_id)?.expediente||"—"),inlineDate(type,r,"fecha"),esc(r.tipo_obligacion||"—"),esc(r.tipo||"—"),inlineStatus(type,r),inlineDate(type,r,"fecha_proxima")];
 }
 function list(type){
- const rows=cache[type]||[];
+ const rawRows=cache[type]||[];
+ const rows=sortRows(type,filterRows(type,rawRows));
  const headers={
-  expedientes:["RAZÓN SOCIAL","EXPEDIENTE","CUANTÍA","TIPO OBLIGACIÓN","ESTADO","GESTIÓN","FECHA AVISO DE COBRO","FECHA OPP","FECHA EMBARGO","FECHA DESEMBARGO","FECHA INVESTIGACIÓN DE BIENES","FECHA MANDAMIENTO DE PAGO"],
-  titulos:["RAZÓN SOCIAL","TDJ","FECHA TDJ","VALOR","TIPO OBLIGACIÓN","ESTADO","RADICADO","FECHA TRÁMITE"],
-  pagos:["RAZÓN SOCIAL","EXPEDIENTE","RECIBO","FECHA PAGO","VALOR","TIPO OBLIGACIÓN","ESTADO","TIPO PAGO","APLICACIÓN"],
-  actuaciones:["RAZÓN SOCIAL","EXPEDIENTE","FECHA","TIPO OBLIGACIÓN","TIPO ACTUACIÓN","ESTADO","PRÓXIMA GESTIÓN"]
+  expedientes:[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente","EXPEDIENTE"],["cuantia","CUANTÍA"],["tipo_obligacion","TIPO OBLIGACIÓN"],["estado","ESTADO"],["gestion","GESTIÓN"],["fecha_aviso_cobro","FECHA AVISO DE COBRO"],["fecha_opp","FECHA OPP"],["fecha_embargo","FECHA EMBARGO"],["fecha_desembargo","FECHA DESEMBARGO"],["fecha_investigacion_bienes","FECHA INVESTIGACIÓN DE BIENES"],["fecha_mandamiento_pago","FECHA MANDAMIENTO DE PAGO"]],
+  titulos:[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["tdj","TDJ"],["fecha_tdj","FECHA TDJ"],["valor","VALOR"],["tipo_obligacion","TIPO OBLIGACIÓN"],["estado","ESTADO"],["solicitud_radicado","RADICADO"],["fecha_tramite","FECHA TRÁMITE"]],
+  pagos:[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente_id","EXPEDIENTE"],["recibo","RECIBO"],["fecha_pago","FECHA PAGO"],["valor","VALOR"],["tipo_obligacion","TIPO OBLIGACIÓN"],["estado","ESTADO"],["tipo_pago","TIPO PAGO"],["aplicacion","APLICACIÓN"]],
+  actuaciones:[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente_id","EXPEDIENTE"],["fecha","FECHA"],["tipo_obligacion","TIPO OBLIGACIÓN"],["tipo","TIPO ACTUACIÓN"],["estado","ESTADO"],["fecha_proxima","PRÓXIMA GESTIÓN"]]
  }[type];
- $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button></div><div class="tablewrap"><table><thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join("")+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+rowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+r.id+')">EDITAR</button><button onclick="del(\''+type+'\','+r.id+')">ELIMINAR</button></td><td class="observation-cell">'+observationText(r)+'</td></tr>').join("")+'</tbody></table>'+(rows.length?"":'<div class="empty">NO HAY REGISTROS</div>')+'</div>';
+ const activeNote=tableState[type].sortKey?'<span class="sort-note">ORDEN: '+esc(tableState[type].sortKey.toUpperCase())+' '+(tableState[type].asc?"ASCENDENTE":"DESCENDENTE")+'</span>':"";
+ const head=headers.map(([k,h])=>sortHeader(type,k,h)).join("");
+ $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button>'+filterOptions(type)+activeNote+'</div><div class="tablewrap"><table><thead><tr>'+head+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+rowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+r.id+')">EDITAR</button><button onclick="del(\''+type+'\','+r.id+')">ELIMINAR</button></td><td class="observation-cell">'+observationText(r)+'</td></tr>').join("")+'</tbody></table>'+(rows.length?"":'<div class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</div>')+'</div>';
+ bindInlineDateFields($("content"));
 }
 async function updateInlineGestion(id,value,selectEl){
  const rec=cache.expedientes.find(x=>Number(x.id)===Number(id)); if(!rec)return;
@@ -302,6 +393,17 @@ async function updateInlineDate(id,key,value,inputEl){
  if(r.error){inputEl.value=previous;alert("NO SE PUDO ACTUALIZAR LA FECHA: "+r.error.message);return;}
  rec[key]=next||null;render();
 }
+async function updateInlineDate(type,id,key,value,inputEl){
+ const rec=(cache[type]||[]).find(x=>Number(x.id)===Number(id)); if(!rec)return;
+ const previous=String(rec[key]||"").slice(0,10),next=String(value||"");
+ inputEl.disabled=true;
+ const r=await db.from(defs[type].table).update({[key]:next||null}).eq("id",id);
+ inputEl.disabled=false;
+ if(r.error){inputEl.value=displayDate(previous);alert("NO SE PUDO ACTUALIZAR LA FECHA: "+r.error.message);return;}
+ rec[key]=next||null;
+ await load();
+ render();
+}
 async function updateInlineStatus(type,id,value,selectEl){
  const rec=(cache[type]||[]).find(x=>Number(x.id)===Number(id)); if(!rec)return;
  const previous=rec.estado||"",next=upper(value||""); if(!next)return;
@@ -309,7 +411,26 @@ async function updateInlineStatus(type,id,value,selectEl){
  const r=await db.from(defs[type].table).update({estado:next}).eq("id",id);
  selectEl.disabled=false;
  if(r.error){selectEl.value=previous;alert("NO SE PUDO ACTUALIZAR EL ESTADO: "+r.error.message);return;}
- rec.estado=next;selectEl.value=next;render();
+ rec.estado=next;selectEl.value=next;
+ await syncWorkflowStatus(type,rec,next);
+ await load();
+ render();
+}
+async function syncWorkflowStatus(type,rec,next){
+ const ops=[];
+ if(type==="expedientes" && /TERMINAD|FINALIZAD/.test(next)){
+   const relT=cache.titulos.filter(x=>x.expediente_id===rec.id||x.contribuyente_id===rec.contribuyente_id);
+   const relP=cache.pagos.filter(x=>x.expediente_id===rec.id||x.contribuyente_id===rec.contribuyente_id);
+   const relA=cache.actuaciones.filter(x=>x.expediente_id===rec.id||x.contribuyente_id===rec.contribuyente_id);
+   for(const x of relP)if(x.estado!=="TERMINADO")ops.push(db.from(defs.pagos.table).update({estado:"TERMINADO"}).eq("id",x.id));
+   for(const x of relA)if(x.estado!=="FINALIZADO")ops.push(db.from(defs.actuaciones.table).update({estado:"FINALIZADO"}).eq("id",x.id));
+   for(const x of relT)if(["DEVUELTO","ENDOSADO","APLICADO"].indexOf(upper(x.estado))<0)ops.push(db.from(defs.titulos.table).update({estado:"APLICADO"}).eq("id",x.id));
+ }
+ if(type==="expedientes" && next==="DEVUELTO"){
+   const relA=cache.actuaciones.filter(x=>x.expediente_id===rec.id);
+   for(const x of relA)if(x.estado!=="DEVUELTO")ops.push(db.from(defs.actuaciones.table).update({estado:"DEVUELTO"}).eq("id",x.id));
+ }
+ if(ops.length)await Promise.all(ops);
 }
 function matchingIds(q){
  const query=String(q||"").trim().toLowerCase();
@@ -327,17 +448,20 @@ function matchingIds(q){
 }
 function consolidatedHome(q){
  const ids=matchingIds(q).expedientes;
- const rows=cache.expedientes.filter(e=>ids.has(e.id));
+ let rows=cache.expedientes.filter(e=>ids.has(e.id));
+ rows=sortRows("expedientes",filterRows("expedientes",rows));
  const body=rows.map(e=>{
-   const c=contrib(e.contribuyente_id),ts=cache.titulos.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id),ps=cache.pagos.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id),as=cache.actuaciones.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id);
+   const c=contributorData(e.contribuyente_id),ts=cache.titulos.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id),ps=cache.pagos.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id),as=cache.actuaciones.filter(x=>x.expediente_id===e.id||x.contribuyente_id===e.contribuyente_id);
    const obs=[e.observaciones,...ts.map(x=>x.observaciones),...ps.map(x=>x.observaciones),...as.map(x=>x.descripcion)].filter(Boolean).join(" | ");
    const titStates=ts.map(x=>upper(x.estado)).filter(Boolean).join(" · "),pagosTotal=ps.reduce((s,x)=>s+Number(x.valor||0),0),acts=as.map(x=>upper(x.tipo)).filter(Boolean).join(" · ");
-   return '<tr><td>'+esc(c?.nit||"")+'</td><td>'+esc(c?.razon_social||"")+'</td><td>'+esc(e.expediente||"")+'</td><td>'+esc(e.tipo_obligacion||"—")+'</td><td>'+money(e.cuantia)+'</td><td>'+inlineStatus("expedientes",e)+'</td><td>'+esc(displayDate(e.fecha_aviso_cobro)||"—")+'</td><td>'+esc(displayDate(e.fecha_opp)||"—")+'</td><td>'+esc(displayDate(e.fecha_mandamiento_pago)||"—")+'</td><td>'+esc(displayDate(e.fecha_embargo)||"—")+'</td><td>'+esc(displayDate(e.fecha_desembargo)||"—")+'</td><td>'+esc(displayDate(e.fecha_investigacion_bienes)||"—")+'</td><td>'+esc(titStates||"—")+'</td><td>'+money(pagosTotal)+'</td><td>'+esc(acts||"—")+'</td><td class="observation-cell">'+esc(obs||"—")+'</td></tr>';
+   return '<tr><td>'+esc(c.nit||"")+'</td><td>'+esc(c.razon||"")+'</td><td>'+esc(e.expediente||"")+'</td><td>'+esc(e.tipo_obligacion||"—")+'</td><td>'+money(e.cuantia)+'</td><td>'+inlineStatus("expedientes",e)+'</td><td>'+inlineDate("expedientes",e,"fecha_aviso_cobro")+'</td><td>'+inlineDate("expedientes",e,"fecha_opp")+'</td><td>'+inlineDate("expedientes",e,"fecha_embargo")+'</td><td>'+inlineDate("expedientes",e,"fecha_desembargo")+'</td><td>'+inlineDate("expedientes",e,"fecha_investigacion_bienes")+'</td><td>'+inlineDate("expedientes",e,"fecha_mandamiento_pago")+'</td><td>'+esc(titStates||"—")+'</td><td>'+money(pagosTotal)+'</td><td>'+esc(acts||"—")+'</td><td class="observation-cell">'+esc(obs||"—")+'</td></tr>';
  }).join("");
- const c=cache,total=c.expedientes.reduce((s,x)=>s+Number(x.cuantia||0),0),head=q?'<div class="filter-context"><b>FILTRO ACTIVO:</b> '+esc(q)+' <span>'+rows.length+' EXPEDIENTES RELACIONADOS</span></div>':"";
- return '<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>LA BÚSQUEDA SUPERIOR SE CONSERVA ENTRE PESTAÑAS Y PERMITE CONSULTAR LA INFORMACIÓN CONSOLIDADA DEL EXPEDIENTE.</p></div>'+head+'<div class="card-body consolidated-card" style="margin-top:16px"><h3 class="section-title">CONSULTA CONSOLIDADA</h3><div class="tablewrap"><table><thead><tr><th>NIT</th><th>RAZÓN SOCIAL</th><th>EXPEDIENTE</th><th>OBLIGACIÓN</th><th>CUANTÍA</th><th>ESTADO</th><th>FECHA AVISO</th><th>FECHA OPP</th><th>FECHA MANDAMIENTO DE PAGO</th><th>FECHA EMBARGO</th><th>FECHA DESEMBARGO</th><th>FECHA INVESTIGACIÓN DE BIENES</th><th>ESTADOS TÍTULOS</th><th>TOTAL PAGOS</th><th>ACTUACIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+(body||'<tr><td colspan="16" class="empty">NO HAY INFORMACIÓN PARA EL FILTRO</td></tr>')+'</tbody></table></div></div>';
+ const c=cache,total=c.expedientes.reduce((s,x)=>s+Number(x.cuantia||0),0),head=q?'<div class="filter-context"><b>BÚSQUEDA:</b> '+esc(q)+' <span>'+rows.length+' EXPEDIENTES RELACIONADOS</span></div>':"";
+ const headers=[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente","EXPEDIENTE"],["tipo_obligacion","OBLIGACIÓN"],["cuantia","CUANTÍA"],["estado","ESTADO"],["fecha_aviso_cobro","FECHA AVISO"],["fecha_opp","FECHA OPP"],["fecha_embargo","FECHA EMBARGO"],["fecha_desembargo","FECHA DESEMBARGO"],["fecha_investigacion_bienes","FECHA INVESTIGACIÓN"],["fecha_mandamiento_pago","FECHA MANDAMIENTO DE PAGO"]];
+ const headHtml=headers.map(([k,h])=>sortHeader("expedientes",k,h)).join("");
+ return '<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>LA BÚSQUEDA SUPERIOR SE CONSERVA ENTRE PESTAÑAS Y PERMITE CONSULTAR LA INFORMACIÓN CONSOLIDADA DEL EXPEDIENTE.</p></div>'+head+'<div class="card-body consolidated-card" style="margin-top:16px"><div class="toolbar">'+filterOptions("expedientes")+'</div><h3 class="section-title">CONSULTA CONSOLIDADA</h3><div class="tablewrap"><table><thead><tr>'+headHtml+'<th>ESTADOS TÍTULOS</th><th>TOTAL PAGOS</th><th>ACTUACIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+(body||'<tr><td colspan="16" class="empty">NO HAY INFORMACIÓN PARA EL FILTRO</td></tr>')+'</tbody></table></div></div>';
 }
-function home(){const q=$("search").value.trim();$("content").innerHTML=consolidatedHome(q);}
+function home(){const q=$("search").value.trim();$("content").innerHTML=consolidatedHome(q);bindInlineDateFields($("content"));}
 
 async function ensureContributor(nit,razon_social){
  const n=String(nit||"").trim();
