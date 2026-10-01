@@ -203,3 +203,35 @@
 .tablewrap td .inline-status{margin:-3px 0}
 
 .inline-date{min-width:145px;padding:6px 8px;border:1px solid #c9dce8;border-radius:7px;background:#fafdff;color:#214e6d;font:inherit;font-size:10px;font-weight:700;cursor:pointer;outline:none}.inline-date:focus{border-color:#249bd5;box-shadow:0 0 0 3px #249bd51a}.inline-date:disabled{opacity:.65;cursor:wait}.gestion-status{min-width:150px}.tablewrap td{vertical-align:middle}.tablewrap td:has(.inline-date){min-width:155px}
+/* TABLAS: ORDENAMIENTO, FILTROS Y FECHAS EDITABLES */
+.tablewrap th{padding:7px 8px;background:#eaf5fc;position:sticky;top:0;z-index:2}
+.sort-header{
+ width:100%;padding:5px 6px;margin:0;background:transparent!important;border:1px solid transparent!important;
+ color:#285a7d!important;font-size:10px!important;font-weight:800!important;text-align:left!important;
+ border-radius:6px!important;white-space:normal;line-height:1.25;box-shadow:none!important;transform:none!important;
+}
+.sort-header:hover{background:#dff2fc!important;border-color:#c7e4f2!important;transform:none!important}
+.sort-header.active{background:#d8effb!important;color:#0b628f!important;border-color:#b9dced!important}
+.table-filter{
+ padding:7px 9px;border:1px solid #c9dce8;border-radius:7px;background:#fff;color:#285a7d;
+ font:inherit;font-size:10px;font-weight:700;min-width:165px;outline:none;
+}
+.table-filter:focus{border-color:#249bd5;box-shadow:0 0 0 3px #249bd51a}
+.sort-note{
+ padding:7px 9px;border-radius:7px;background:#eef8ff;border:1px solid #cde6f3;
+ color:#246181;font-size:10px;font-weight:700;
+}
+.inline-date-control{display:grid;grid-template-columns:minmax(112px,1fr) 34px;gap:4px;align-items:center;min-width:154px}
+.inline-date-field,.inline-date-picker{
+ width:100%;height:30px;padding:5px 7px;border:1px solid #c9dce8;border-radius:6px;
+ background:#fafdff;color:#214e6d;font:inherit;font-size:10px;font-weight:700;outline:none;
+}
+.inline-date-picker{width:34px;padding:5px;cursor:pointer}
+.inline-date-field:focus,.inline-date-picker:focus{border-color:#249bd5;box-shadow:0 0 0 3px #249bd51a}
+.inline-date-field:disabled{opacity:.65;cursor:wait}
+.tablewrap td:has(.inline-date-control){min-width:158px}
+.toolbar{align-items:center}
+@media(max-width:900px){
+ .table-filter{min-width:140px}
+ .sort-note{width:100%}
+}
