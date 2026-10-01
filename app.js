@@ -289,17 +289,17 @@ function gestionOptions(current){
  return '<option value="">SELECCIONAR...</option>'+list.map(x=>'<option value="'+esc(x)+'" '+(cur===x?"selected":"")+'>'+esc(x)+'</option>').join("")+(cur&&!list.includes(cur)?'<option value="'+esc(cur)+'" selected>'+esc(cur)+' (ACTUAL)</option>':"");
 }
 function inlineStatus(type,r){
- return '<select class="inline-status" data-status-type="'+type+'" data-status-id="'+r.id+'" onchange="updateInlineStatus(\''+type+'\','+r.id+',this.value,this)">'+statusOptions(type,r.estado)+'</select>';
+ return '<select class="inline-status" data-inline-field="estado" data-status-type="'+type+'" data-status-id="'+r.id+'" onchange="updateInlineStatus(\''+type+'\','+r.id+',this.value,this)">'+statusOptions(type,r.estado)+'</select>';
 }
 function inlineGestion(r){
- return '<select class="inline-status gestion-status" data-status-type="expedientes-gestion" data-status-id="'+r.id+'" onchange="updateInlineGestion('+r.id+',this.value,this)">'+gestionOptions(r.gestion)+'</select>';
+ return '<select class="inline-status gestion-status" data-inline-field="gestion" data-status-type="expedientes-gestion" data-status-id="'+r.id+'" onchange="updateInlineGestion('+r.id+',this.value,this)">'+gestionOptions(r.gestion)+'</select>';
 }
 function obligationOptions(current){
  const cur=upper(current||"");
  return '<option value="">SELECCIONAR...</option>'+OBLIGATION_TYPES.map(x=>'<option value="'+esc(x)+'" '+(cur===x?"selected":"")+'>'+esc(x)+'</option>').join("")+(cur&&!OBLIGATION_TYPES.includes(cur)?'<option value="'+esc(cur)+'" selected>'+esc(cur)+' (ACTUAL)</option>':"");
 }
 function inlineObligation(type,r){
- return '<select class="inline-status obligation-status" data-field="tipo_obligacion" data-status-type="'+type+'" data-status-id="'+r.id+'" onchange="updateInlineField(\''+type+'\','+r.id+',\'tipo_obligacion\',this.value,this)">'+obligationOptions(r.tipo_obligacion)+'</select>';
+ return '<select class="inline-status obligation-status" data-inline-field="tipo_obligacion" data-field="tipo_obligacion" data-status-type="'+type+'" data-status-id="'+r.id+'" onchange="updateInlineField(\''+type+'\','+r.id+',\'tipo_obligacion\',this.value,this)">'+obligationOptions(r.tipo_obligacion)+'</select>';
 }
 function inlineDate(r,key){
  const value=String(r[key]||"").slice(0,10);
@@ -313,6 +313,8 @@ function inlineDate(type,r,key){
 }
 function bindInlineDateFields(root){
  root.querySelectorAll(".inline-date-field").forEach(input=>{
+   if(input.dataset.bound==="1")return;
+   input.dataset.bound="1";
    const picker=input.parentElement.querySelector(".inline-date-picker");
    const sync=async()=>{
      const raw=input.value.trim();
@@ -330,12 +332,23 @@ function bindInlineDateFields(root){
      if(iso&&picker)picker.value=iso;
      input.setCustomValidity("");
    });
+   input.addEventListener("keydown",async e=>{
+     if((e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==="b")return;
+     if(e.key!=="Enter")return;
+     e.preventDefault();
+     await sync();
+     const col=input.dataset.dateKey,type=input.dataset.dateType;
+     const next=[...root.querySelectorAll('.inline-date-field[data-date-type="'+CSS.escape(type)+'"][data-date-key="'+CSS.escape(col)+'"]')];
+     const idx=next.indexOf(input);
+     if(idx>=0&&next[idx+1]){next[idx+1].focus();next[idx+1].select();}
+   });
    input.addEventListener("blur",sync);
    if(picker)picker.addEventListener("change",async()=>{
      input.value=displayDate(picker.value);
      await updateInlineDate(input.dataset.dateType,Number(input.dataset.dateId),input.dataset.dateKey,picker.value,input);
    });
  });
+ bindBulkFillShortcuts(root);
 }
 function sortHeader(type,key,label){
  const st=tableState[type]||{};
@@ -442,17 +455,8 @@ function list(type){
   bindInlineDateFields($("content"));
  }
 }
-async function updateInlineGestion(id,value,selectEl){
- const rec=cache.expedientes.find(x=>Number(x.id)===Number(id)); if(!rec)return;
- const previous=rec.gestion||"",next=upper(value||""); if(!next)return;
- selectEl.disabled=true;
- const r=await db.from(defs.expedientes.table).update({gestion:next}).eq("id",id);
- selectEl.disabled=false;
- if(r.error){selectEl.value=previous;alert("NO SE PUDO ACTUALIZAR LA GESTIÓN: "+r.error.message);return;}
- rec.gestion=next;selectEl.value=next;render();
-}
 async function updateInlineField(type,id,column,value,control){
- const rec=(cache[type]||[]).find(x=>Number(x.id)===Number(id)); if(!rec)return;
+ const rec=(cache[type]||[]).find(x=>Number(x.id)===Number(id)); if(!rec)return false;
  const previous=rec[column]??"";
  const next=String(value??"").trim();
  if(control)control.disabled=true;
@@ -461,14 +465,15 @@ async function updateInlineField(type,id,column,value,control){
    if(error)throw error;
    rec[column]=next||null;
    if(column==="tipo_obligacion")await syncRelatedField(type,rec,next);
-   await load();
-   render();
+   // NO RECARGAR NI RENDERIZAR: CONSERVAMOS FOCO Y POSICIÓN PARA EDICIÓN MASIVA.
+   return true;
  }catch(error){
    if(control){
      if(column.startsWith("fecha_")||column==="fecha"||column==="fecha_proxima")control.value=displayDate(String(previous||"").slice(0,10));
      else control.value=previous||"";
    }
    alert("NO SE PUDO ACTUALIZAR "+String(column).toUpperCase()+": "+(error.message||error));
+   return false;
  }finally{
    if(control)control.disabled=false;
  }
@@ -479,16 +484,16 @@ async function updateInlineDate(type,id,key,value,inputEl){
 async function updateInlineStatus(type,id,value,selectEl){
  const rec=(cache[type]||[]).find(x=>Number(x.id)===Number(id));
  const next=upper(value||"");
- await updateInlineField(type,id,"estado",next,selectEl);
- if(rec&&rec.estado===next){
+ const ok=await updateInlineField(type,id,"estado",next,selectEl);
+ if(ok&&rec){
    await syncWorkflowStatus(type,rec,next);
-   await load();
-   render();
+   rec.estado=next;
  }
 }
 async function updateInlineGestion(id,value,selectEl){
  return updateInlineField("expedientes",id,"gestion",upper(value||""),selectEl);
 }
+
 async function syncRelatedField(type,rec,value){
  const target=upper(value||"");
  const groups={expedientes:cache.expedientes,titulos:cache.titulos,pagos:cache.pagos,actuaciones:cache.actuaciones};
@@ -505,6 +510,90 @@ async function syncRelatedField(type,rec,value){
      }
    }
  }
+}
+
+// CTRL+B EN UN CAMPO EDITABLE = RELLENAR TODAS LAS FILAS VISIBLES/FILTRADAS DE ESA MISMA COLUMNA.
+// NO HACE FALTA SELECCIONAR UNA POR UNA: EL FILTRO DEFINE EL CONJUNTO DE DESTINO.
+async function bulkFillFromFocused(event){
+ if(!(event.ctrlKey||event.metaKey)||String(event.key).toLowerCase()!=="b")return;
+ const el=event.target;
+ if(!el.matches(".inline-date-field,.inline-status"))return;
+ event.preventDefault();
+ event.stopPropagation();
+
+ let type=el.dataset.statusType||el.dataset.dateType||"";
+ if(type==="expedientes-gestion")type="expedientes";
+ const column=el.dataset.inlineField||el.dataset.dateKey||"";
+ if(!type||!column)return;
+
+ let value="";
+ if(el.classList.contains("inline-date-field")){
+   const iso=isoFromDateInput(el.value);
+   if(!iso){alert("FECHA NO VÁLIDA. USE DD-MM-AA.");return;}
+   value=iso;
+ }else{
+   value=el.value;
+ }
+ if(value==="")return;
+
+ const table=el.closest("table");
+ if(!table)return;
+
+ const selector=el.classList.contains("inline-date-field")
+   ? '.inline-date-field[data-date-type="'+CSS.escape(type)+'"][data-date-key="'+CSS.escape(column)+'"]'
+   : '.inline-status[data-status-type="'+CSS.escape(el.dataset.statusType||type)+'"][data-inline-field="'+CSS.escape(column)+'"]';
+ const controls=[...table.querySelectorAll(selector)];
+ if(!controls.length)return;
+
+ const ids=[...new Set(controls.map(x=>Number(x.dataset.dateId||x.dataset.statusId)).filter(Number.isFinite))];
+ if(!ids.length)return;
+
+ const ok=confirm("SE ACTUALIZARÁN "+ids.length+" REGISTROS VISIBLES CON EL VALOR: "+(el.classList.contains("inline-date-field")?displayDate(value):String(value).toUpperCase())+". ¿CONTINUAR?");
+ if(!ok)return;
+
+ controls.forEach(x=>x.disabled=true);
+ try{
+   const {error}=await db.rpc("cartera_bulk_update_field",{
+     p_table:defs[type].table,
+     p_ids:ids,
+     p_column:column,
+     p_value:value
+   });
+   if(error)throw error;
+
+   for(const row of cache[type]||[]){
+     const id=Number(row.id);
+     if(ids.includes(id))row[column]=value||null;
+   }
+
+   // Sincronización de obligación y flujo para los registros afectados.
+   if(column==="tipo_obligacion"){
+     for(const row of (cache[type]||[])){
+       if(ids.includes(Number(row.id)))await syncRelatedField(type,row,value);
+     }
+   }
+   if(column==="estado"){
+     for(const row of (cache[type]||[])){
+       if(ids.includes(Number(row.id)))await syncWorkflowStatus(type,row,upper(value));
+     }
+   }
+
+   controls.forEach(x=>{
+     if(x.classList.contains("inline-date-field")){
+       x.value=displayDate(value);
+       const picker=x.parentElement.querySelector(".inline-date-picker");
+       if(picker)picker.value=value;
+     }else x.value=value;
+     x.disabled=false;
+   });
+ }catch(error){
+   controls.forEach(x=>x.disabled=false);
+   alert("NO SE PUDO HACER LA ACTUALIZACIÓN MASIVA: "+(error.message||error));
+ }
+}
+
+function bindBulkFillShortcuts(root){
+ root.addEventListener("keydown",bulkFillFromFocused);
 }
 function matchingIds(q){
  const query=String(q||"").trim().toLowerCase();
