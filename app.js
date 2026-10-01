@@ -431,53 +431,60 @@ async function updateInlineGestion(id,value,selectEl){
  if(r.error){selectEl.value=previous;alert("NO SE PUDO ACTUALIZAR LA GESTIÓN: "+r.error.message);return;}
  rec.gestion=next;selectEl.value=next;render();
 }
-async function updateInlineDate(id,key,value,inputEl){
- const rec=cache.expedientes.find(x=>Number(x.id)===Number(id)); if(!rec)return;
- const previous=String(rec[key]||"").slice(0,10),next=String(value||"");
- inputEl.disabled=true;
- const r=await db.from(defs.expedientes.table).update({[key]:next||null}).eq("id",id);
- inputEl.disabled=false;
- if(r.error){inputEl.value=previous;alert("NO SE PUDO ACTUALIZAR LA FECHA: "+r.error.message);return;}
- rec[key]=next||null;render();
+async function updateInlineField(type,id,column,value,control){
+ const rec=(cache[type]||[]).find(x=>Number(x.id)===Number(id)); if(!rec)return;
+ const previous=rec[column]??"";
+ const next=String(value??"").trim();
+ if(control)control.disabled=true;
+ try{
+   const {error}=await db.rpc("cartera_update_field",{p_table:defs[type].table,p_id:Number(id),p_column:column,p_value:next});
+   if(error)throw error;
+   rec[column]=next||null;
+   if(column==="tipo_obligacion")await syncRelatedField(type,rec,next);
+   await load();
+   render();
+ }catch(error){
+   if(control){
+     if(column.startsWith("fecha_")||column==="fecha"||column==="fecha_proxima")control.value=displayDate(String(previous||"").slice(0,10));
+     else control.value=previous||"";
+   }
+   alert("NO SE PUDO ACTUALIZAR "+String(column).toUpperCase()+": "+(error.message||error));
+ }finally{
+   if(control)control.disabled=false;
+ }
 }
 async function updateInlineDate(type,id,key,value,inputEl){
- const rec=(cache[type]||[]).find(x=>Number(x.id)===Number(id)); if(!rec)return;
- const previous=String(rec[key]||"").slice(0,10),next=String(value||"");
- inputEl.disabled=true;
- const r=await db.from(defs[type].table).update({[key]:next||null}).eq("id",id);
- inputEl.disabled=false;
- if(r.error){inputEl.value=displayDate(previous);alert("NO SE PUDO ACTUALIZAR LA FECHA: "+r.error.message);return;}
- rec[key]=next||null;
- await load();
- render();
+ return updateInlineField(type,id,key,value,inputEl);
 }
 async function updateInlineStatus(type,id,value,selectEl){
- const rec=(cache[type]||[]).find(x=>Number(x.id)===Number(id)); if(!rec)return;
- const previous=rec.estado||"",next=upper(value||""); if(!next)return;
- selectEl.disabled=true;
- const r=await db.from(defs[type].table).update({estado:next}).eq("id",id);
- selectEl.disabled=false;
- if(r.error){selectEl.value=previous;alert("NO SE PUDO ACTUALIZAR EL ESTADO: "+r.error.message);return;}
- rec.estado=next;selectEl.value=next;
- await syncWorkflowStatus(type,rec,next);
- await load();
- render();
+ const rec=(cache[type]||[]).find(x=>Number(x.id)===Number(id));
+ const next=upper(value||"");
+ await updateInlineField(type,id,"estado",next,selectEl);
+ if(rec&&rec.estado===next){
+   await syncWorkflowStatus(type,rec,next);
+   await load();
+   render();
+ }
 }
-async function syncWorkflowStatus(type,rec,next){
- const ops=[];
- if(type==="expedientes" && /TERMINAD|FINALIZAD/.test(next)){
-   const relT=cache.titulos.filter(x=>x.expediente_id===rec.id||x.contribuyente_id===rec.contribuyente_id);
-   const relP=cache.pagos.filter(x=>x.expediente_id===rec.id||x.contribuyente_id===rec.contribuyente_id);
-   const relA=cache.actuaciones.filter(x=>x.expediente_id===rec.id||x.contribuyente_id===rec.contribuyente_id);
-   for(const x of relP)if(x.estado!=="TERMINADO")ops.push(db.from(defs.pagos.table).update({estado:"TERMINADO"}).eq("id",x.id));
-   for(const x of relA)if(x.estado!=="FINALIZADO")ops.push(db.from(defs.actuaciones.table).update({estado:"FINALIZADO"}).eq("id",x.id));
-   for(const x of relT)if(["DEVUELTO","ENDOSADO","APLICADO"].indexOf(upper(x.estado))<0)ops.push(db.from(defs.titulos.table).update({estado:"APLICADO"}).eq("id",x.id));
+async function updateInlineGestion(id,value,selectEl){
+ return updateInlineField("expedientes",id,"gestion",upper(value||""),selectEl);
+}
+async function syncRelatedField(type,rec,value){
+ const target=upper(value||"");
+ const groups={expedientes:cache.expedientes,titulos:cache.titulos,pagos:cache.pagos,actuaciones:cache.actuaciones};
+ for(const [otherType,rows] of Object.entries(groups)){
+   if(otherType===type)continue;
+   for(const x of rows){
+     const sameContributor=rec.contribuyente_id&&x.contribuyente_id&&Number(rec.contribuyente_id)===Number(x.contribuyente_id);
+     const sameExp=rec.expediente_id&&x.expediente_id&&Number(rec.expediente_id)===Number(x.expediente_id);
+     const relatedToExp=type==="expedientes"&&(sameContributor||Number(x.expediente_id)===Number(rec.id));
+     if(sameContributor||sameExp||relatedToExp){
+       const rr=await db.rpc("cartera_update_field",{p_table:defs[otherType].table,p_id:Number(x.id),p_column:"tipo_obligacion",p_value:target});
+       if(rr.error)throw rr.error;
+       x.tipo_obligacion=target;
+     }
+   }
  }
- if(type==="expedientes" && next==="DEVUELTO"){
-   const relA=cache.actuaciones.filter(x=>x.expediente_id===rec.id);
-   for(const x of relA)if(x.estado!=="DEVUELTO")ops.push(db.from(defs.actuaciones.table).update({estado:"DEVUELTO"}).eq("id",x.id));
- }
- if(ops.length)await Promise.all(ops);
 }
 function matchingIds(q){
  const query=String(q||"").trim().toLowerCase();
