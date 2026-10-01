@@ -201,7 +201,7 @@ function home(){
    if(q)rows=rows.filter(r=>{const c=contributorData(r.contribuyente_id,r);return [c.nit,c.razon,r.expediente,r.tipo_obligacion,r.estado,r.gestion].some(v=>String(v||"").toLowerCase().includes(q));});
    rows=sortRows("expedientes",rows);
    const c=cache,total=c.expedientes.reduce((s,x)=>s+Number(x.cuantia||0),0);
-   const body=rows.map(r=>{const cd=contributorData(r.contribuyente_id);return '<tr><td>'+esc(cd.nit||"—")+'</td><td>'+esc(cd.razon||"—")+'</td><td>'+esc(r.expediente||"—")+'</td><td>'+money(r.cuantia)+'</td><td>'+inlineObligation("expedientes",r)+'</td><td>'+inlineStatus("expedientes",r)+'</td><td>'+inlineGestion(r)+'</td><td>'+inlineDate("expedientes",r,"fecha_aviso_cobro")+'</td><td>'+inlineDate("expedientes",r,"fecha_opp")+'</td><td>'+inlineDate("expedientes",r,"fecha_embargo")+'</td><td>'+inlineDate("expedientes",r,"fecha_desembargo")+'</td><td>'+inlineDate("expedientes",r,"fecha_investigacion_bienes")+'</td><td>'+inlineDate("expedientes",r,"fecha_mandamiento_pago")+'</td></tr>';}).join("");
+   const body=rows.map(r=>{const cd=contributorData(r.contribuyente_id,r);return '<tr><td>'+esc(cd.nit||"—")+'</td><td>'+esc(cd.razon||"—")+'</td><td>'+esc(r.expediente||"—")+'</td><td>'+money(r.cuantia)+'</td><td>'+inlineObligation("expedientes",r)+'</td><td>'+inlineStatus("expedientes",r)+'</td><td>'+inlineGestion(r)+'</td><td>'+inlineDate("expedientes",r,"fecha_aviso_cobro")+'</td><td>'+inlineDate("expedientes",r,"fecha_opp")+'</td><td>'+inlineDate("expedientes",r,"fecha_embargo")+'</td><td>'+inlineDate("expedientes",r,"fecha_desembargo")+'</td><td>'+inlineDate("expedientes",r,"fecha_investigacion_bienes")+'</td><td>'+inlineDate("expedientes",r,"fecha_mandamiento_pago")+'</td></tr>';}).join("");
    const note=q?'<div class="filter-context"><b>BÚSQUEDA ACTIVA:</b> '+esc(q)+'<span>'+rows.length+' EXPEDIENTES</span></div>':"";
    const headers=[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente","EXPEDIENTE"],["cuantia","CUANTÍA"],["tipo_obligacion","TIPO OBLIGACIÓN"],["estado","ESTADO"],["gestion","GESTIÓN"],["fecha_aviso_cobro","FECHA AVISO"],["fecha_opp","FECHA OPP"],["fecha_embargo","FECHA EMBARGO"],["fecha_desembargo","FECHA DESEMBARGO"],["fecha_investigacion_bienes","FECHA INVESTIGACIÓN"],["fecha_mandamiento_pago","FECHA MANDAMIENTO"]];
    const head=headers.map(([k,h])=>sortHeader("expedientes",k,h)).join("");
@@ -427,7 +427,7 @@ function filterRows(type,rows){
  });
 }
 function rowData(type,r){
- const c=contributorData(r.contribuyente_id);
+ const c=contributorData(r.contribuyente_id,r);
  if(type==="expedientes")return [esc(c.nit||"—"),esc(c.razon||"—"),esc(r.expediente),money(r.cuantia),inlineObligation(type,r),inlineStatus(type,r),inlineGestion(r),inlineDate(type,r,"fecha_aviso_cobro"),inlineDate(type,r,"fecha_opp"),inlineDate(type,r,"fecha_embargo"),inlineDate(type,r,"fecha_desembargo"),inlineDate(type,r,"fecha_investigacion_bienes"),inlineDate(type,r,"fecha_mandamiento_pago")];
  if(type==="titulos")return [esc(c.nit||"—"),esc(c.razon||"—"),esc(r.tdj),inlineDate(type,r,"fecha_tdj"),money(r.valor),inlineObligation(type,r),inlineStatus(type,r),esc(r.solicitud_radicado||"—"),inlineDate(type,r,"fecha_tramite")];
  if(type==="pagos"){const e=exped(r.expediente_id);return [esc(c.nit||"—"),esc(c.razon||"—"),esc(e?.expediente||"—"),esc(r.recibo||"—"),inlineDate(type,r,"fecha_pago"),money(r.valor),inlineObligation(type,r),inlineStatus(type,r),esc(r.tipo_pago||"—"),esc(r.aplicacion||"—")];}
@@ -444,7 +444,7 @@ function safeInlineDate(type,r,key){
  return '<div class="inline-date-control"><input class="inline-date-field" type="text" inputmode="numeric" maxlength="10" value="'+esc(displayDate(value))+'" placeholder="DD-MM-AA" data-date-type="'+esc(type)+'" data-date-id="'+Number(r?.id||0)+'" data-date-key="'+esc(key)+'"><input class="inline-date-picker" type="date" value="'+esc(value)+'" aria-label="CALENDARIO '+esc(key)+'"></div>';
 }
 function fallbackRowData(type,r){
- const c=safeContributor(r.contribuyente_id);
+ const c=contributorData(r.contribuyente_id,r);
  if(type==="expedientes")return [safeCell(c.nit),safeCell(c.razon),safeCell(r.expediente),money(r.cuantia),inlineObligation(type,r),inlineStatus(type,r),inlineGestion(r),safeInlineDate(type,r,"fecha_aviso_cobro"),safeInlineDate(type,r,"fecha_opp"),safeInlineDate(type,r,"fecha_embargo"),safeInlineDate(type,r,"fecha_desembargo"),safeInlineDate(type,r,"fecha_investigacion_bienes"),safeInlineDate(type,r,"fecha_mandamiento_pago")];
  if(type==="titulos")return [safeCell(c.nit),safeCell(c.razon),safeCell(r.tdj),safeInlineDate(type,r,"fecha_tdj"),money(r.valor),inlineObligation(type,r),inlineStatus(type,r),safeCell(r.solicitud_radicado),safeInlineDate(type,r,"fecha_tramite")];
  if(type==="pagos"){const e=exped(r.expediente_id);return [safeCell(c.nit),safeCell(c.razon),safeCell(e?.expediente),safeCell(r.recibo),safeInlineDate(type,r,"fecha_pago"),money(r.valor),inlineObligation(type,r),inlineStatus(type,r),safeCell(r.tipo_pago),safeCell(r.aplicacion)];}
@@ -701,9 +701,9 @@ function openModal(type,id){
  const d=defs[type],r=id?(cache[type]||[]).find(x=>x.id===id):{};
  const formRecord={...r,__type:type};
  if(type==="expedientes"){
-   const c=contrib(r.contribuyente_id);
-   formRecord.nit=c?.nit||"";
-   formRecord.razon_social=c?.razon_social||"";
+   const c=contributorData(r.contribuyente_id,r);
+   formRecord.nit=c.nit||"";
+   formRecord.razon_social=c.razon||"";
  }
  $("mtitle").textContent=(id?"EDITAR ":"NUEVO ")+d.title;
  $("mform").innerHTML='<div class="formgrid">'+d.fields.map(f=>fieldHtml(f,formRecord)).join("")+'</div><button class="save">GUARDAR</button>';
