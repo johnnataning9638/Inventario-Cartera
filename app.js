@@ -1,7 +1,7 @@
 const {createClient}=supabase;
 const SB_URL="https://ulismfqyxnujkwvjjmcp.supabase.co";
 const SB_KEY="sb_publishable_WMk7vHWlDfdW2aegoFtHSA_9Zq0l_r-";
-const db=createClient(SB_URL,SB_KEY,{auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true,flowType:"pkce"}});
+const db=createClient(SB_URL,SB_KEY,{auth:{autoRefreshToken:true,persistSession:false,detectSessionInUrl:false,flowType:"implicit"}});
 let currentUser=null,view="inicio";
 let cache={contribuyentes:[],expedientes:[],titulos:[],pagos:[],actuaciones:[],embargos:[]};
 const tableState={
@@ -612,14 +612,7 @@ async function bootAuth(){
    setMsg(e.message||"NO FUE POSIBLE VALIDAR EL ACCESO",true);
  }
 }
-db.auth.onAuthStateChange((event,session)=>{
- // No desmontar la aplicación por eventos intermedios de autenticación.
- // Solo SIGNED_OUT sin sesión confirma que el usuario cerró sesión.
- if(event==="SIGNED_OUT" && !session){
-   currentUser=null;
-   $("app").classList.add("hidden");
-   $("auth").classList.remove("hidden");
-   setMsg("");
- }
-});
+// La navegación de la aplicación se controla explícitamente desde login/logout.
+// No se desmonta la interfaz desde onAuthStateChange: Supabase puede emitir eventos
+// intermedios durante refresh/token exchange que no significan que el usuario cerró sesión.
 bootAuth();
