@@ -123,7 +123,7 @@ function reports(){
 
 const defs={
  expedientes:{table:"cartera_expedientes",title:"EXPEDIENTES",fields:[
-  ["contribuyente_id","CONTRIBUYENTE","contrib"],["expediente","EXPEDIENTE"],["cuantia","CUANTÍA","number"],["tipo_obligacion","TIPO OBLIGACIÓN"],["estado","ESTADO"],["fecha_aviso_cobro","FECHA AVISO","date"],["fecha_mandamiento_pago","MANDAMIENTO","date"],["fecha_investigacion_bienes","INVESTIGACIÓN BIENES","date"],["observaciones","OBSERVACIONES","textarea"]
+  ["nit","NIT","nit"],["razon_social","RAZÓN SOCIAL","social"],["expediente","EXPEDIENTE"],["cuantia","CUANTÍA","number"],["tipo_obligacion","TIPO OBLIGACIÓN"],["estado","ESTADO"],["fecha_aviso_cobro","FECHA AVISO","date"],["fecha_opp","FECHA OPP","date"],["fecha_embargo","FECHA EMBARGO","date"],["fecha_desembargo","FECHA DESEMBARGO","date"],["fecha_mandamiento_pago","FECHA MANDAMIENTO DE PAGO","date"],["fecha_investigacion_bienes","FECHA INVESTIGACIÓN DE BIENES","date"],["observaciones","OBSERVACIONES","textarea"]
  ]},
  titulos:{table:"cartera_titulos",title:"TÍTULOS / TDJ",fields:[
   ["contribuyente_id","CONTRIBUYENTE","contrib"],["tdj","TDJ"],["fecha_tdj","FECHA TDJ","date"],["valor","VALOR","number"],["estado","ESTADO"],["solicitud_radicado","RADICADO"],["fecha_tramite","FECHA TRÁMITE","date"],["observaciones","OBSERVACIONES","textarea"]
@@ -140,6 +140,7 @@ function fieldHtml(f,r){
  const [key,label,type]=f,val=r[key]??"";
  if(type==="contrib")return '<label>'+label+'<select name="'+key+'"><option value="">SELECCIONAR CONTRIBUYENTE</option>'+cache.contribuyentes.map(c=>'<option value="'+c.id+'" '+(String(val)===String(c.id)?"selected":"")+'>'+esc(c.razon_social)+' — '+esc(c.nit)+'</option>').join("")+'</select></label>';
  if(type==="exped")return '<label>'+label+'<select name="'+key+'"><option value="">SELECCIONAR EXPEDIENTE</option>'+cache.expedientes.map(e=>{const c=contrib(e.contribuyente_id);return '<option value="'+e.id+'" '+(String(val)===String(e.id)?"selected":"")+'>'+esc(e.expediente)+' — '+esc(c?.razon_social||"")+'</option>'}).join("")+'</select></label>';
+ if(type==="nit"||type==="social")return '<label>'+label+'<input name="'+key+'" type="text" value="'+esc(val)+'" '+(type==="nit"?'inputmode="numeric"':'')+' required></label>';
  if(type==="textarea")return '<label>'+label+'<textarea name="'+key+'">'+esc(val)+'</textarea></label>';
  return '<label>'+label+'<input name="'+key+'" type="'+(type||"text")+'" value="'+esc(val)+'"></label>';
 }
@@ -165,19 +166,49 @@ function list(type){
  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button></div><div class="tablewrap"><table><thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join("")+'<th>ACCIONES</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+rowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+r.id+')">EDITAR</button><button onclick="del(\''+type+'\','+r.id+')">ELIMINAR</button></td></tr>').join("")+'</tbody></table>'+(rows.length?"":'<div class="empty">NO HAY REGISTROS</div>')+'</div>';
 }
 
+async function ensureContributor(nit,razon_social){
+ const n=String(nit||"").trim();
+ const rs=upper(razon_social||"");
+ if(!n||!rs)throw Error("NIT Y RAZÓN SOCIAL SON OBLIGATORIOS PARA CREAR EL EXPEDIENTE");
+ const found=cache.contribuyentes.find(c=>String(c.nit||"").trim()===n);
+ if(found){
+   if(found.razon_social!==rs){
+     const u=await db.from("cartera_contribuyentes").update({razon_social:rs}).eq("id",found.id);
+     if(u.error)throw u.error;
+   }
+   return found.id;
+ }
+ const ins=await db.from("cartera_contribuyentes").insert({nit:n,razon_social:rs}).select("id").single();
+ if(ins.error)throw ins.error;
+ return ins.data.id;
+}
+
 function openModal(type,id){
  const d=defs[type],r=id?(cache[type]||[]).find(x=>x.id===id):{};
+ const formRecord={...r};
+ if(type==="expedientes"){
+   const c=contrib(r.contribuyente_id);
+   formRecord.nit=c?.nit||"";
+   formRecord.razon_social=c?.razon_social||"";
+ }
  $("mtitle").textContent=(id?"EDITAR ":"NUEVO ")+d.title;
- $("mform").innerHTML='<div class="formgrid">'+d.fields.map(f=>fieldHtml(f,r)).join("")+'</div><button class="save">GUARDAR</button>';
+ $("mform").innerHTML='<div class="formgrid">'+d.fields.map(f=>fieldHtml(f,formRecord)).join("")+'</div><button class="save">GUARDAR</button>';
  $("mform").onsubmit=async e=>{
   e.preventDefault();const o={};
   new FormData(e.target).forEach((v,k)=>o[k]=v===""?null:v);
-  for(const f of d.fields){const k=f[0];if(f[2]==="number"&&o[k]!==null)o[k]=Number(o[k]);if(!["date","number","contrib","exped"].includes(f[2]))o[k]=upper(o[k]);}
-  if(type==="titulos"){const c=contrib(o.contribuyente_id);o.nit=c?.nit||null;o.contribuyente=c?.razon_social||null}
-  if(type==="pagos"){const c=contrib(o.contribuyente_id);o.nit=c?.nit||null;o.razon_social=c?.razon_social||null}
-  const r2=id?await db.from(d.table).update(o).eq("id",id):await db.from(d.table).insert(o);
-  if(r2.error)return alert("ERROR: "+r2.error.message);
-  $("modal").classList.add("hidden");await load();render();
+  try{
+    if(type==="expedientes"){
+      const idContrib=await ensureContributor(o.nit,o.razon_social);
+      o.contribuyente_id=idContrib;
+      delete o.nit;delete o.razon_social;
+    }
+    for(const f of d.fields){const k=f[0];if(f[2]==="number"&&o[k]!==null)o[k]=Number(o[k]);if(!["date","number","contrib","exped","nit","social"].includes(f[2]))o[k]=upper(o[k]);}
+    if(type==="titulos"){const c=contrib(o.contribuyente_id);o.nit=c?.nit||null;o.contribuyente=c?.razon_social||null}
+    if(type==="pagos"){const c=contrib(o.contribuyente_id);o.nit=c?.nit||null;o.razon_social=c?.razon_social||null}
+    const r2=id?await db.from(d.table).update(o).eq("id",id):await db.from(d.table).insert(o);
+    if(r2.error)return alert("ERROR: "+r2.error.message);
+    $("modal").classList.add("hidden");await load();render();
+  }catch(x){alert("ERROR: "+(x.message||x));}
  };
  $("modal").classList.remove("hidden");
 }
@@ -202,17 +233,34 @@ function importXlsx(type){
  i.onchange=async()=>{
   const f=i.files[0];if(!f)return;
   const data=await f.arrayBuffer(),wb=XLSX.read(data),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:null}),d=defs[type];
+  let ok=0;
   for(const row of rows){
    const o={};
-   for(const fld of d.fields){const k=fld[0],alts=[k,fld[1],fld[1].replaceAll(" ","_"),k.toUpperCase()];const hit=alts.find(a=>row[a]!==undefined);if(hit!==undefined)o[k]=row[hit]}
-   if(!o.contribuyente_id&&row.NIT){const c=cache.contribuyentes.find(x=>String(x.nit)===String(row.NIT));if(c)o.contribuyente_id=c.id}
+   for(const fld of d.fields){
+     const k=fld[0],alts=[k,fld[1],fld[1].replaceAll(" ","_"),k.toUpperCase()];
+     const hit=alts.find(a=>row[a]!==undefined);
+     if(hit!==undefined)o[k]=row[hit];
+   }
+   if(type==="expedientes"){
+     const nit=row.NIT??row.nit??o.nit;
+     const razon=row.RAZON_SOCIAL??row["RAZÓN SOCIAL"]??row.razon_social??o.razon_social;
+     try{o.contribuyente_id=await ensureContributor(nit,razon);delete o.nit;delete o.razon_social;}
+     catch(err){alert("ERROR EN EXPEDIENTE "+(row.EXPEDIENTE||"")+": "+err.message);continue}
+   }else if(!o.contribuyente_id&&row.NIT){
+     const c=cache.contribuyentes.find(x=>String(x.nit)===String(row.NIT));if(c)o.contribuyente_id=c.id
+   }
    if(type==="pagos"&&!o.expediente_id&&row.EXPEDIENTE_RELACIONADO){const e=cache.expedientes.find(x=>x.expediente===row.EXPEDIENTE_RELACIONADO);if(e)o.expediente_id=e.id}
    if(type==="titulos"){const c=contrib(o.contribuyente_id);o.nit=c?.nit||row.NIT||null;o.contribuyente=c?.razon_social||row.RAZON_SOCIAL||null}
    if(type==="pagos"){const c=contrib(o.contribuyente_id);o.nit=c?.nit||row.NIT||null;o.razon_social=c?.razon_social||row.RAZON_SOCIAL||null}
-   for(const fld of d.fields){if(!["date","number","contrib","exped"].includes(fld[2]))o[fld[0]]=upper(o[fld[0]]);if(fld[2]==="number"&&o[fld[0]]!==null)o[fld[0]]=Number(o[fld[0]])}
-   const r=await db.from(d.table).insert(o);if(r.error){alert("ERROR EN IMPORTACIÓN: "+r.error.message);break}
+   for(const fld of d.fields){
+     if(!["date","number","contrib","exped","nit","social"].includes(fld[2]))o[fld[0]]=upper(o[fld[0]]);
+     if(fld[2]==="number"&&o[fld[0]]!==null)o[fld[0]]=Number(o[fld[0]]);
+   }
+   const r=await db.from(d.table).insert(o);
+   if(r.error){alert("ERROR EN IMPORTACIÓN: "+r.error.message);break}
+   ok++;
   }
-  await load();render();
+  await load();render();if(ok)alert("IMPORTACIÓN COMPLETADA: "+ok+" REGISTROS.");
  };i.click();
 }
 
