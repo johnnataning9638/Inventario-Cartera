@@ -392,11 +392,11 @@ function filterOptions(type){
  const unique=(values)=>[...new Set(values.map(x=>upper(x)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));
  const statusValues=unique(rows.map(x=>x.estado));
  const obligationValues=unique(rows.map(x=>x.tipo_obligacion));
- const statusList=type==="expedientes"?[...new Set([...EXPEDIENTE_STATUS,...statusValues])]:type==="titulos"?[...new Set([...TITULO_STATUS,...statusValues])]:type==="pagos"?[...new Set([...PAGO_STATUS,...statusValues])]:ACTUACION_STATUS;
- const statusSelect='<select class="table-filter" title="FILTRAR POR ESTADO" onchange="setTableFilter(\\''+type+'\\',\\'status\\',this.value)"><option value="">TODOS LOS ESTADOS</option><option value="__EMPTY__" '+(st.status==="__EMPTY__"?"selected":"")+'>SIN ESTADO</option>'+statusList.map(x=>'<option value="'+esc(x)+'" '+(st.status===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>';
- const obligationSelect='<select class="table-filter" title="FILTRAR POR TIPO DE OBLIGACIÓN" onchange="setTableFilter(\\''+type+'\\',\\'tipo\\',this.value)"><option value="">TODAS LAS OBLIGACIONES</option><option value="__EMPTY__" '+(st.tipo==="__EMPTY__"?"selected":"")+'>SIN TIPO OBLIGACIÓN</option>'+[...new Set([...OBLIGATION_TYPES,...obligationValues])].map(x=>'<option value="'+esc(x)+'" '+(st.tipo===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>';
- const gestionSelect=type==="expedientes"?'<select class="table-filter" title="FILTRAR POR GESTIÓN" onchange="setTableFilter(\\'expedientes\\',\\'gestion\\',this.value)"><option value="">TODAS LAS GESTIONES</option><option value="__EMPTY__" '+(st.gestion==="__EMPTY__"?"selected":"")+'>SIN GESTIÓN</option>'+EXPEDIENTE_GESTION.map(x=>'<option value="'+esc(x)+'" '+(st.gestion===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>':"";
- const actionTypeSelect=type==="actuaciones"?'<select class="table-filter" title="FILTRAR POR TIPO DE ACTUACIÓN" onchange="setTableFilter(\\'actuaciones\\',\\'accion\\',this.value)"><option value="">TODOS LOS TIPOS DE ACTUACIÓN</option><option value="__EMPTY__" '+(st.accion==="__EMPTY__"?"selected":"")+'>SIN TIPO</option>'+unique(rows.map(x=>x.tipo)).map(x=>'<option value="'+esc(x)+'" '+(st.accion===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>':"";
+ const statusList=type==="expedientes"?[...new Set([...EXPEDIENTE_STATUS,...statusValues])]:type==="titulos"?[...new Set([...TITULO_STATUS,...statusValues])]:type==="pagos"?[...new Set([...PAGO_STATUS,...statusValues])]:[...new Set([...ACTUACION_STATUS,...statusValues])];
+ const statusSelect='<select class="table-filter" title="FILTRAR POR ESTADO" data-filter-type="'+esc(type)+'" data-filter-key="status" onchange="setTableFilter(this.dataset.filterType,this.dataset.filterKey,this.value)"><option value="">TODOS LOS ESTADOS</option><option value="__EMPTY__" '+(st.status==="__EMPTY__"?"selected":"")+'>SIN ESTADO</option>'+statusList.map(x=>'<option value="'+esc(x)+'" '+(st.status===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>';
+ const obligationSelect='<select class="table-filter" title="FILTRAR POR TIPO DE OBLIGACIÓN" data-filter-type="'+esc(type)+'" data-filter-key="tipo" onchange="setTableFilter(this.dataset.filterType,this.dataset.filterKey,this.value)"><option value="">TODAS LAS OBLIGACIONES</option><option value="__EMPTY__" '+(st.tipo==="__EMPTY__"?"selected":"")+'>SIN TIPO OBLIGACIÓN</option>'+[...new Set([...OBLIGATION_TYPES,...obligationValues])].sort((a,b)=>a.localeCompare(b,"es")).map(x=>'<option value="'+esc(x)+'" '+(st.tipo===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>';
+ const gestionSelect=type==="expedientes"?'<select class="table-filter" title="FILTRAR POR GESTIÓN" data-filter-type="expedientes" data-filter-key="gestion" onchange="setTableFilter(this.dataset.filterType,this.dataset.filterKey,this.value)"><option value="">TODAS LAS GESTIONES</option><option value="__EMPTY__" '+(st.gestion==="__EMPTY__"?"selected":"")+'>SIN GESTIÓN</option>'+EXPEDIENTE_GESTION.map(x=>'<option value="'+esc(x)+'" '+(st.gestion===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>':"";
+ const actionTypeSelect=type==="actuaciones"?'<select class="table-filter" title="FILTRAR POR TIPO DE ACTUACIÓN" data-filter-type="actuaciones" data-filter-key="accion" onchange="setTableFilter(this.dataset.filterType,this.dataset.filterKey,this.value)"><option value="">TODOS LOS TIPOS DE ACTUACIÓN</option><option value="__EMPTY__" '+(st.accion==="__EMPTY__"?"selected":"")+'>SIN TIPO</option>'+unique(rows.map(x=>x.tipo)).map(x=>'<option value="'+esc(x)+'" '+(st.accion===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>':"";
  return '<div class="filter-group">'+statusSelect+obligationSelect+gestionSelect+actionTypeSelect+'</div>';
 }
 function setTableFilter(type,key,value){
@@ -406,7 +406,7 @@ function setTableFilter(type,key,value){
 function matchesFilterValue(value,filter){
  if(!filter)return true;
  if(filter==="__EMPTY__")return !String(value??"").trim();
- return upper(value)!==filter?false:true;
+ return upper(value)===filter;
 }
 function filterRows(type,rows){
  const st=tableState[type]||{};
