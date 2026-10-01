@@ -30,19 +30,34 @@ async function load(){
  for(const t of tables){
    const k=t.replace("cartera_","");
    const r=await db.from(t).select("*").order("id",{ascending:false});
-   if(r.error)throw r.error;
+   if(r.error)throw Error("ERROR AL CARGAR "+t.toUpperCase()+": "+r.error.message);
    cache[k]=r.data||[];
  }
 }
 
 async function login(e){
- e.preventDefault();setMsg("VALIDANDO ACCESO...");
- const r=await db.auth.signInWithPassword({email:$("email").value.trim().toLowerCase(),password:$("pass").value});
- if(r.error)return setMsg("CORREO O CONTRASEÑA INCORRECTOS",true);
+ e.preventDefault();
+ const email=$("email").value.trim().toLowerCase(),password=$("pass").value;
+ if(!email||!password)return setMsg("INGRESA CORREO Y CONTRASEÑA",true);
+ setMsg("VALIDANDO ACCESO...");
+ const r=await db.auth.signInWithPassword({email,password});
+ if(r.error){
+   const m=String(r.error.message||"").toLowerCase();
+   return setMsg(m.includes("invalid login credentials")?"CORREO O CONTRASEÑA INCORRECTOS":r.error.message,true);
+ }
  try{
-   await ensureAccess(r.data.user);currentUser=r.data.user;await load();
-   $("auth").classList.add("hidden");$("app").classList.remove("hidden");$("user").textContent=currentUser.email.toUpperCase();render();
- }catch(x){await db.auth.signOut();setMsg(x.message||"NO FUE POSIBLE VALIDAR EL ACCESO",true)}
+   await ensureAccess(r.data.user);
+   currentUser=r.data.user;
+   await load();
+   $("auth").classList.add("hidden");
+   $("app").classList.remove("hidden");
+   $("user").textContent=currentUser.email.toUpperCase();
+   render();
+ }catch(x){
+   console.error(x);
+   setMsg(x.message||"NO FUE POSIBLE CARGAR EL INVENTARIO",true);
+   await db.auth.signOut();
+ }
 }
 
 async function register(){
@@ -197,5 +212,25 @@ $("search").oninput=()=>{
 };
 
 db.auth.getSession().then(async({data})=>{
- if(data.session)try{await ensureAccess(data.session.user);currentUser=data.session.user;await load();$("auth").classList.add("hidden");$("app").classList.remove("hidden");$("user").textContent=currentUser.email.toUpperCase();render()}catch(e){await db.auth.signOut()}
+ if(!data.session)return;
+ try{
+   await ensureAccess(data.session.user);
+   currentUser=data.session.user;
+   await load();
+   $("auth").classList.add("hidden");
+   $("app").classList.remove("hidden");
+   $("user").textContent=currentUser.email.toUpperCase();
+   render();
+ }catch(e){
+   console.error(e);
+   await db.auth.signOut();
+   setMsg(e.message||"NO FUE POSIBLE CARGAR EL INVENTARIO",true);
+ }
+});
+db.auth.onAuthStateChange((event,session)=>{
+ if(event==="SIGNED_OUT"){
+   currentUser=null;
+   $("app").classList.add("hidden");
+   $("auth").classList.remove("hidden");
+ }
 });
