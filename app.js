@@ -179,14 +179,19 @@ function filteredList(type,q){
  $("content").insertBefore(document.createRange().createContextualFragment(headersNote),$("content").firstElementChild);
 }
 function render(){
- const titles={inicio:"INICIO",expedientes:"EXPEDIENTES",titulos:"TÍTULOS / TDJ",pagos:"PAGOS",actuaciones:"ACTUACIONES",reportes:"REPORTES"};
- $("title").textContent=titles[view];
- document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
- if(view==="inicio")return home();
- if(view==="reportes")return reports();
- const q=$("search").value.trim().toLowerCase();
- if(q)return filteredList(view,q);
- list(view);
+ try{
+  const titles={inicio:"INICIO",expedientes:"EXPEDIENTES",titulos:"TÍTULOS / TDJ",pagos:"PAGOS",actuaciones:"ACTUACIONES",reportes:"REPORTES"};
+  $("title").textContent=titles[view]||String(view).toUpperCase();
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+  if(view==="inicio")return home();
+  if(view==="reportes")return reports();
+  const q=String($("search").value||"").trim().toLowerCase();
+  if(q)return filteredList(view,q);
+  return list(view);
+ }catch(error){
+  console.error("ERROR DE VISTA",view,error);
+  $("content").innerHTML='<div class="card-body" style="padding:24px"><h3 class="section-title">ERROR DE VISTA</h3><p>NO SE PUDO CARGAR ESTA VISTA. INTENTA ACTUALIZAR LA PÁGINA.</p><pre style="white-space:pre-wrap;font-size:11px;color:#a23">'+esc(error.stack||error.message||error)+'</pre></div>';
+ }
 }
 
 function home(){
