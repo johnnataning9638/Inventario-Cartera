@@ -97,6 +97,7 @@ function bindDateFields(root){
   });
 }
 const contrib=id=>cache.contribuyentes.find(x=>Number(x.id)===Number(id));
+// Adaptador único para las tablas: separa NIT y razón social sin alterar el modelo de datos.\nfunction contributorData(id){const c=contrib(id);return c?{nit:c.nit||"",razon:c.razon_social||""}:{nit:"",razon:""};}
 const exped=id=>cache.expedientes.find(x=>Number(x.id)===Number(id));
 const person=id=>{const c=contrib(id);return c?'<div class="person">'+esc(c.razon_social)+'</div><div class="nit">NIT '+esc(c.nit)+'</div>':'<span class="muted">SIN CONTRIBUYENTE</span>'};
 const status=v=>{const s=String(v||"SIN ESTADO").toUpperCase();let c="gray";if(/TERMIN|APLICADO|CERRAD|ENDOSAD/.test(s))c="green";else if(/GESTIÓN|PENDIENTE|INVESTIG/.test(s))c="blue";else if(/PRÓXIMO|ENLOSAD/.test(s))c="amber";else if(/EMBARG|VENC/.test(s))c="red";return '<span class="badge '+c+'">'+esc(s)+'</span>'};
