@@ -1,7 +1,7 @@
 const {createClient}=supabase;
 const SB_URL="https://ulismfqyxnujkwvjjmcp.supabase.co";
 const SB_KEY="sb_publishable_WMk7vHWlDfdW2aegoFtHSA_9Zq0l_r-";
-const db=createClient(SB_URL,SB_KEY);
+const db=createClient(SB_URL,SB_KEY,{auth:{autoRefreshToken:true,persistSession:false,detectSessionInUrl:true}});
 let currentUser=null,view="inicio";
 let cache={contribuyentes:[],expedientes:[],titulos:[],pagos:[],actuaciones:[],embargos:[]};
 
@@ -230,11 +230,17 @@ $("search").oninput=()=>{
  $("content").innerHTML='<div class="card-body"><h3 class="section-title">BÚSQUEDA 360°</h3><p class="muted">CONTRIBUYENTES: '+c.length+' · EXPEDIENTES RELACIONADOS: '+e.length+'</p><div class="tablewrap"><table><thead><tr><th>NIT</th><th>RAZÓN SOCIAL</th><th>EXPEDIENTE</th><th>OBLIGACIÓN</th><th>CUANTÍA</th><th>ESTADO</th></tr></thead><tbody>'+e.map(x=>{const y=contrib(x.contribuyente_id);return '<tr><td>'+esc(y?.nit||"")+'</td><td>'+esc(y?.razon_social||"")+'</td><td>'+esc(x.expediente)+'</td><td>'+esc(x.tipo_obligacion)+'</td><td>'+money(x.cuantia)+'</td><td>'+status(x.estado)+'</td></tr>'}).join("")+'</tbody></table></div></div>';
 };
 
-db.auth.getSession().then(async({data})=>{
- if(!data.session)return;
+async function bootAuth(){
+ $("app").classList.add("hidden");
+ $("auth").classList.remove("hidden");
+ setMsg("VALIDANDO SESIÓN...");
  try{
-   await ensureAccess(data.session.user);
-   currentUser=data.session.user;
+   const {data:{session}}=await db.auth.getSession();
+   if(!session){setMsg("");return;}
+   const u=await db.auth.getUser();
+   if(u.error||!u.data.user)throw Error("SESIÓN NO VÁLIDA");
+   await ensureAccess(u.data.user);
+   currentUser=u.data.user;
    await load();
    $("auth").classList.add("hidden");
    $("app").classList.remove("hidden");
@@ -243,13 +249,18 @@ db.auth.getSession().then(async({data})=>{
  }catch(e){
    console.error(e);
    await db.auth.signOut();
-   setMsg(e.message||"NO FUE POSIBLE CARGAR EL INVENTARIO",true);
+   currentUser=null;
+   $("app").classList.add("hidden");
+   $("auth").classList.remove("hidden");
+   setMsg(e.message||"NO FUE POSIBLE VALIDAR EL ACCESO",true);
  }
-});
-db.auth.onAuthStateChange((event,session)=>{
+}
+db.auth.onAuthStateChange((event)=>{
  if(event==="SIGNED_OUT"){
    currentUser=null;
    $("app").classList.add("hidden");
    $("auth").classList.remove("hidden");
+   setMsg("");
  }
 });
+bootAuth();
