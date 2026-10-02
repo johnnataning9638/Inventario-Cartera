@@ -426,8 +426,9 @@ function saveColumnWidths(x){
  try{localStorage.setItem(COLUMN_WIDTHS_KEY,JSON.stringify(x));}catch{}
 }
 function bindColumnResize(root,type){
- const table=root?.querySelector?.("table");
+ const table=root?.querySelector?.("table.resizable-table");
  if(!table)return;
+ table.classList.add("resizable-table");
  const widths=loadColumnWidths();
  const saved=widths[type]||{};
  table.querySelectorAll("thead th[data-column-key]").forEach((th)=>{
@@ -625,7 +626,7 @@ function list(type){
    try{return '<tr>'+rowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+observationText(r)+'</td></tr>';}
    catch(rowError){console.error("ERROR FILA "+type,r,rowError);return '<tr>'+fallbackRowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+safeCell(r.observaciones||r.descripcion)+'</td></tr>';}
   }).join("");
-  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button>'+activeNote+'</div><div class="tablewrap"><table class="resizable-table"><thead><tr>'+head+'<th>ACCIONES</th>'+sortHeader(type,"observaciones","OBSERVACIONES")+'</tr></thead><tbody>'+body+(rows.length?"":'<tr><td colspan="'+(headers.length+2)+'" class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</td></tr>')+'</tbody></table></div>';
+  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button>'+activeNote+'</div><div class="tablewrap"><table class="resizable-table"><thead><tr>'+head+'<th data-column-key="__actions"><div class="header-tools"><button type="button" class="sort-header">ACCIONES</button></div><span class="column-resizer" title="AJUSTAR ANCHO"></span></th>'+sortHeader(type,"observaciones","OBSERVACIONES")+'</tr></thead><tbody>'+body+(rows.length?"":'<tr><td colspan="'+(headers.length+2)+'" class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</td></tr>')+'</tbody></table></div>';
   bindInlineDateFields($("content"));bindColumnResize($("content"),type);
  }catch(error){
   console.error("ERROR AL RENDERIZAR "+type,error);
