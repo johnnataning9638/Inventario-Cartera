@@ -473,7 +473,7 @@ function sortValue(type,row,key){
  if(key==="razon_social"){const c=contrib(row.contribuyente_id);return String(c?.razon_social||row.razon_social||"").toUpperCase();}
  if(["cuantia","valor"].includes(key))return Number(row[key]||0);
  if(["fecha","fecha_proxima","fecha_tdj","fecha_tramite","fecha_pago","fecha_aviso_cobro","fecha_opp","fecha_embargo","fecha_desembargo","fecha_investigacion_bienes","fecha_mandamiento_pago"].includes(key))return row[key]?new Date(row[key]+"T00:00:00").getTime():-Infinity;
- return String(row[key]??"").toUpperCase();
+ return String(columnFilterValue(type,row,key)??"").toUpperCase();
 }
 function sortRows(type,rows){
  const st=tableState[type];
