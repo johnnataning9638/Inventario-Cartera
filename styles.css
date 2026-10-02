@@ -267,3 +267,12 @@
 /* MODALES SIEMPRE POR ENCIMA DE HEADER, TOOLBAR Y TABLAS */
 .modal{z-index:1000!important}
 .modalbox{position:relative;z-index:1001}
+
+/* COLUMNAS REDIMENSIONABLES TIPO EXCEL */
+.resizable-table{table-layout:auto!important}
+.resizable-table th{position:sticky;overflow:visible}
+.resizable-table td{white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.resizable-table th .header-tools{min-width:0}
+.column-resizer{position:absolute;right:-3px;top:0;width:7px;height:100%;cursor:col-resize;z-index:20;border-right:2px solid transparent}
+.column-resizer:hover,.column-resizer:active{border-right-color:#2d76aa;background:#dcecf7aa}
+body.resizing-column,body.resizing-column *{cursor:col-resize!important;user-select:none!important}
