@@ -546,7 +546,7 @@ function list(type){
    actuaciones:[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente_id","EXPEDIENTE"],["fecha","FECHA"],["tipo_obligacion","TIPO OBLIGACIÓN"],["tipo","TIPO ACTUACIÓN"],["estado","ESTADO"],["fecha_proxima","PRÓXIMA GESTIÓN"]]
   }[type]||[];
   const body=rawRows.map(r=>'<tr>'+fallbackRowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+safeCell(r.observaciones||r.descripcion)+'</td></tr>').join("");
-  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button>'</div><div class="tablewrap"><table><thead><tr>'+headers.map(([k,h])=>'<th>'+esc(h)+'</th>').join("")+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+   $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button></div><div class="tablewrap"><table><thead><tr>'+headers.map(([k,h])=>'<th>'+esc(h)+'</th>').join("")+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+body+'</tbody></table></div>';
   bindInlineDateFields($("content"));
  }
 }
