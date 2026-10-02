@@ -450,8 +450,6 @@ function setColumnFilterRange(type,key,part,value){
 function clearAllFilters(){
   Object.keys(tableState).forEach(type=>{
     tableState[type].filters={};
-    tableState[type].sortKey=null;
-    tableState[type].asc=null;
   });
   const search=$("search");
   if(search)search.value="";
