@@ -98,7 +98,20 @@ function bindDateFields(root){
 }
 const contrib=id=>cache.contribuyentes.find(x=>Number(x.id)===Number(id));
 // Adaptador único para las tablas: separa NIT y razón social sin alterar el modelo de datos.
-function contributorData(id,record){const c=contrib(id);return {nit:String(record?.nit||c?.nit||""),razon:String(record?.razon_social||record?.contribuyente||c?.razon_social||"")};}
+function contributorData(id,record){
+ const direct=contrib(id);
+ let nit=String(record?.nit||direct?.nit||"");
+ let razon=String(record?.razon_social||record?.contribuyente||direct?.razon_social||"");
+ if(!direct&&nit){
+   const byNit=cache.contribuyentes.find(x=>String(x.nit||"").trim()===nit.trim());
+   if(byNit){nit=String(byNit.nit||nit);razon=String(byNit.razon_social||razon);}
+ }
+ if(!razon&&record?.expediente_id){
+   const e=exped(record.expediente_id);
+   if(e){const ec=contrib(e.contribuyente_id);nit=String(nit||ec?.nit||"");razon=String(razon||ec?.razon_social||"");}
+ }
+ return {nit,razon};
+}
 const exped=id=>cache.expedientes.find(x=>Number(x.id)===Number(id));
 const person=id=>{const c=contrib(id);return c?'<div class="person">'+esc(c.razon_social)+'</div><div class="nit">NIT '+esc(c.nit)+'</div>':'<span class="muted">SIN CONTRIBUYENTE</span>'};
 const status=v=>{const s=String(v||"SIN ESTADO").toUpperCase();let c="gray";if(/TERMIN|APLICADO|CERRAD|ENDOSAD/.test(s))c="green";else if(/GESTIÓN|PENDIENTE|INVESTIG/.test(s))c="blue";else if(/PRÓXIMO|ENLOSAD/.test(s))c="amber";else if(/EMBARG|VENC/.test(s))c="red";return '<span class="badge '+c+'">'+esc(s)+'</span>'};
@@ -253,13 +266,13 @@ const defs={
   ["nit","NIT","nit"],["razon_social","RAZÓN SOCIAL","social"],["expediente","EXPEDIENTE"],["cuantia","CUANTÍA","currency"],["tipo_obligacion","TIPO OBLIGACIÓN","obligation"],["estado","ESTADO","status"],["gestion","GESTIÓN","gestion"],["fecha_aviso_cobro","FECHA AVISO DE COBRO","date"],["fecha_opp","FECHA OPP","date"],["fecha_embargo","FECHA EMBARGO","date"],["fecha_desembargo","FECHA DESEMBARGO","date"],["fecha_investigacion_bienes","FECHA INVESTIGACIÓN DE BIENES","date"],["fecha_mandamiento_pago","FECHA MANDAMIENTO DE PAGO","date"],["observaciones","OBSERVACIONES","textarea"]
  ]},
  titulos:{table:"cartera_titulos",title:"TÍTULOS / TDJ",fields:[
-  ["contribuyente_id","CONTRIBUYENTE","contrib"],["tdj","TDJ"],["fecha_tdj","FECHA TDJ","date"],["valor","VALOR","currency"],["tipo_obligacion","TIPO OBLIGACIÓN","obligation"],["estado","ESTADO","status"],["solicitud_radicado","RADICADO"],["fecha_tramite","FECHA TRÁMITE","date"],["observaciones","OBSERVACIONES","textarea"]
+  ["nit","NIT","nit"],["razon_social","RAZÓN SOCIAL","social"],["expediente_id","EXPEDIENTE","manualexped"],["tdj","TDJ"],["fecha_tdj","FECHA TDJ","date"],["valor","VALOR","currency"],["tipo_obligacion","TIPO OBLIGACIÓN","obligation"],["estado","ESTADO","status"],["solicitud_radicado","RADICADO"],["fecha_tramite","FECHA TRÁMITE","date"],["observaciones","OBSERVACIONES","textarea"]
  ]},
  pagos:{table:"cartera_pagos",title:"PAGOS",fields:[
-  ["contribuyente_id","CONTRIBUYENTE","contrib"],["expediente_id","EXPEDIENTE","exped"],["recibo","RECIBO"],["fecha_pago","FECHA PAGO","date"],["valor","VALOR","currency"],["tipo_obligacion","TIPO OBLIGACIÓN","obligation"],["tipo_pago","TIPO PAGO"],["aplicacion","APLICACIÓN"],["estado","ESTADO","status"],["observaciones","OBSERVACIONES","textarea"]
+  ["nit","NIT","nit"],["razon_social","RAZÓN SOCIAL","social"],["expediente_id","EXPEDIENTE","manualexped"],["recibo","RECIBO"],["fecha_pago","FECHA PAGO","date"],["valor","VALOR","currency"],["tipo_obligacion","TIPO OBLIGACIÓN","obligation"],["tipo_pago","TIPO PAGO"],["aplicacion","APLICACIÓN"],["estado","ESTADO","status"],["observaciones","OBSERVACIONES","textarea"]
  ]},
  actuaciones:{table:"cartera_actuaciones",title:"ACTUACIONES",fields:[
-  ["contribuyente_id","CONTRIBUYENTE","contrib"],["expediente_id","EXPEDIENTE","exped"],["fecha","FECHA","date"],["tipo_obligacion","TIPO OBLIGACIÓN","obligation"],["tipo","TIPO ACTUACIÓN"],["descripcion","DESCRIPCIÓN","textarea"],["responsable","RESPONSABLE"],["fecha_proxima","PRÓXIMA GESTIÓN","date"],["estado","ESTADO","status"]
+  ["nit","NIT","nit"],["razon_social","RAZÓN SOCIAL","social"],["expediente_id","EXPEDIENTE","manualexped"],["fecha","FECHA","date"],["tipo_obligacion","TIPO OBLIGACIÓN","obligation"],["tipo","TIPO ACTUACIÓN"],["descripcion","DESCRIPCIÓN","textarea"],["responsable","RESPONSABLE"],["fecha_proxima","PRÓXIMA GESTIÓN","date"],["estado","ESTADO","status"]
  ]}
 };
 
@@ -267,6 +280,7 @@ function fieldHtml(f,r){
  const [key,label,type]=f,val=r[key]??"";
  if(type==="contrib")return '<label>'+label+'<select name="'+key+'"><option value="">SELECCIONAR CONTRIBUYENTE</option>'+cache.contribuyentes.map(c=>'<option value="'+c.id+'" '+(String(val)===String(c.id)?"selected":"")+'>'+esc(c.razon_social)+' — '+esc(c.nit)+'</option>').join("")+'</select></label>';
  if(type==="exped")return '<label>'+label+'<select name="'+key+'"><option value="">SELECCIONAR EXPEDIENTE</option>'+cache.expedientes.map(e=>{const c=contrib(e.contribuyente_id);return '<option value="'+e.id+'" '+(String(val)===String(e.id)?"selected":"")+'>'+esc(e.expediente)+' — '+esc(c?.razon_social||"")+'</option>'}).join("")+'</select></label>';
+ if(type==="manualexped")return '<label>'+label+'<input name="'+key+'" class="upper-field" type="text" value="'+esc(val)+'" required></label>';
  if(type==="obligation")return '<label>'+label+'<select name="'+key+'"><option value="">SELECCIONAR...</option>'+OBLIGATION_TYPES.map(x=>'<option value="'+esc(x)+'" '+(upper(val)===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select></label>';
  if(type==="status"){
    const current=upper(val||""),map={expedientes:EXPEDIENTE_STATUS,titulos:TITULO_STATUS,pagos:PAGO_STATUS,actuaciones:ACTUACION_STATUS};
@@ -805,6 +819,11 @@ function openModal(type,id){
    const c=contributorData(r.contribuyente_id,r);
    formRecord.nit=c.nit||"";
    formRecord.razon_social=c.razon||"";
+ }else{
+   const c=contributorData(r.contribuyente_id,r);
+   formRecord.nit=c.nit||"";
+   formRecord.razon_social=c.razon||"";
+   if(r.expediente_id){const e=exped(r.expediente_id);formRecord.expediente_id=e?.expediente||"";}
  }
  $("mtitle").textContent=(id?"EDITAR ":"NUEVO ")+d.title;
  $("mform").innerHTML='<div class="formgrid">'+d.fields.map(f=>fieldHtml(f,formRecord)).join("")+'</div><button class="save">GUARDAR</button>';
@@ -823,6 +842,14 @@ function openModal(type,id){
     if(type==="expedientes"){
       const idContrib=await ensureContributor(o.nit,o.razon_social);
       o.contribuyente_id=idContrib;
+      delete o.nit;delete o.razon_social;
+    }else if(["titulos","pagos","actuaciones"].includes(type)){
+      const idContrib=await ensureContributor(o.nit,o.razon_social);
+      o.contribuyente_id=idContrib;
+      const numeroExp=upper(o.expediente_id||"").trim();
+      const expRow=cache.expedientes.find(x=>upper(x.expediente||"").trim()===numeroExp);
+      if(!expRow)throw Error("EL EXPEDIENTE "+numeroExp+" NO EXISTE. CREE PRIMERO EL EXPEDIENTE EN LA PESTAÑA EXPEDIENTES.");
+      o.expediente_id=expRow.id;
       delete o.nit;delete o.razon_social;
     }
     for(const f of d.fields){
