@@ -253,3 +253,13 @@
  .table-filter{min-width:140px}
  .sort-note{width:100%}
 }
+
+/* ANCHO DE IDENTIFICACIÓN: NIT Y RAZÓN SOCIAL */
+.tablewrap table th:nth-child(1),
+.tablewrap table td:nth-child(1){min-width:125px;width:125px}
+.tablewrap table th:nth-child(2),
+.tablewrap table td:nth-child(2){min-width:290px;width:290px}
+.consolidated-card .tablewrap table th:nth-child(1),
+.consolidated-card .tablewrap table td:nth-child(1){min-width:125px;width:125px}
+.consolidated-card .tablewrap table th:nth-child(2),
+.consolidated-card .tablewrap table td:nth-child(2){min-width:290px;width:290px}
