@@ -1,21 +1,4 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inventario de Cartera</title><link rel="stylesheet" href="styles.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script></head><body>
-<div id="auth" class="auth"><div class="card auth-card"><div class="logo">IC</div><h1>INVENTARIO DE CARTERA</h1><p>GESTIÓN Y SEGUIMIENTO DE EXPEDIENTES</p><form id="login" onsubmit="return false;"><input id="email" type="email" placeholder="CORREO ELECTRÓNICO" required><input id="pass" type="password" placeholder="CONTRASEÑA" required><button id="loginBtn" type="submit">INGRESAR</button></form><div class="auth-links"><button id="reg" type="button">CREAR USUARIO</button><button id="forgot" type="button">RECUPERAR CONTRASEÑA</button></div><small id="authmsg"></small></div></div>
+<div id="auth" class="auth"><div class="card auth-card"><div class="logo">IC</div><h1>INVENTARIO DE CARTERA</h1><p>GESTIÓN Y SEGUIMIENTO DE EXPEDIENTES</p><form id="login"><input id="email" type="email" placeholder="CORREO ELECTRÓNICO" required><input id="pass" type="password" placeholder="CONTRASEÑA" required><button>INGRESAR</button></form><div class="auth-links"><button id="reg" type="button">CREAR USUARIO</button><button id="forgot" type="button">RECUPERAR CONTRASEÑA</button></div><small id="authmsg"></small></div></div>
 <div id="app" class="hidden"><aside><div class="brand">INVENTARIO<br><b>DE CARTERA</b></div><nav><button data-view="inicio">INICIO</button><button data-view="expedientes">EXPEDIENTES</button><button data-view="titulos">TÍTULOS / TDJ</button><button data-view="pagos">PAGOS</button><button data-view="actuaciones">ACTUACIONES</button><button data-view="reportes">REPORTES</button></nav><button id="logout" class="logout">CERRAR SESIÓN</button></aside><main><header><div><h2 id="title">INICIO</h2><span id="user"></span></div><input id="search" placeholder="BUSCAR NIT, RAZÓN SOCIAL O EXPEDIENTE..." autocomplete="off"></header><section id="content"></section></main></div>
-<div id="modal" class="modal hidden"><div class="modalbox"><button id="close" class="x">×</button><h3 id="mtitle"></h3><form id="mform"></form></div></div><script src="app.js?v=20261002-login-deep-fix-v1"></script><script src="fix.js?v=20261001-home-cv1"></script><script>
-(function(){
-  function showLoadError(msg){
-    var el=document.getElementById("authmsg");
-    if(el){el.textContent=String(msg||"ERROR AL CARGAR EL MÓDULO DE ACCESO").toUpperCase();el.style.color="#b33d3d";}
-  }
-  window.addEventListener("error",function(ev){
-    var src=String(ev.filename||"");
-    if(src.indexOf("app.js")>=0) showLoadError("ERROR AL CARGAR EL SISTEMA DE ACCESO. ACTUALIZA LA PÁGINA.");
-  });
-  window.addEventListener("unhandledrejection",function(){
-    if(typeof window.login!=="function") showLoadError("ERROR AL INICIALIZAR EL ACCESO. ACTUALIZA LA PÁGINA.");
-  });
-  setTimeout(function(){
-    if(typeof window.login!=="function") showLoadError("EL MÓDULO DE ACCESO NO SE INICIALIZÓ CORRECTAMENTE.");
-  },2000);
-})();
-</script></body></html>
+<div id="modal" class="modal hidden"><div class="modalbox"><button id="close" class="x">×</button><h3 id="mtitle"></h3><form id="mform"></form></div></div><script src="app.js?v=20261002-filters-auth-original-v1"></script><script src="fix.js?v=20261001-home-cv1"></script></body></html>
