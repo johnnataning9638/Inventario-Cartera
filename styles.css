@@ -208,6 +208,20 @@
 .inline-date{min-width:145px;padding:6px 8px;border:1px solid #c9dce8;border-radius:7px;background:#fafdff;color:#214e6d;font:inherit;font-size:10px;font-weight:700;cursor:pointer;outline:none}.inline-date:focus{border-color:#249bd5;box-shadow:0 0 0 3px #249bd51a}.inline-date:disabled{opacity:.65;cursor:wait}.gestion-status{min-width:150px}.tablewrap td{vertical-align:middle}.tablewrap td:has(.inline-date){min-width:155px}
 /* TABLAS: ORDENAMIENTO, FILTROS Y FECHAS EDITABLES */
 .tablewrap th{padding:7px 8px;background:#eaf5fc;position:sticky;top:0;z-index:2}
+.header-tools{position:relative;display:flex;align-items:center;gap:2px;min-width:100%;box-sizing:border-box}
+.header-tools .sort-header{flex:1;min-width:0}
+.filter-icon{width:24px;height:24px;flex:0 0 24px;padding:0;margin:0;border:1px solid transparent!important;border-radius:5px!important;background:transparent!important;color:#285a7d!important;font-size:14px!important;font-weight:800!important;line-height:1;cursor:pointer;box-shadow:none!important}
+.filter-icon:hover,.filter-icon.active{background:#dff2fc!important;border-color:#b9dced!important;color:#0b628f!important}
+.column-filter-panel{position:absolute;display:none;top:calc(100% + 4px);right:0;min-width:210px;max-width:270px;padding:10px;background:#fff;border:1px solid #c9dce8;border-radius:9px;box-shadow:0 12px 28px #16466b2b;z-index:100}
+.column-filter-panel.open{display:flex;flex-direction:column;gap:7px}
+.column-filter-title{font-size:10px;font-weight:800;color:#285a7d;padding-bottom:4px;border-bottom:1px solid #e4edf3}
+.column-filter-input,.column-filter-select{width:100%;box-sizing:border-box;height:30px;padding:5px 7px;border:1px solid #c9dce8;border-radius:6px;background:#fff;color:#214e6d;font:inherit;font-size:10px;outline:none}
+.column-filter-input:focus,.column-filter-select:focus{border-color:#249bd5;box-shadow:0 0 0 2px #249bd51a}
+.column-filter-apply,.column-filter-clear{height:28px;border:1px solid #c9dce8;border-radius:6px;padding:4px 8px;font-size:10px;font-weight:800;cursor:pointer}
+.column-filter-apply{background:#eaf5fc;color:#15577f}
+.column-filter-clear{background:#fff;color:#6a7e8b}
+.tablewrap th.has-column-filter{background:#e5f3fc}
+.tablewrap th .sort-header{padding-right:2px}
 .sort-header{
  width:100%;padding:5px 6px;margin:0;background:transparent!important;border:1px solid transparent!important;
  color:#285a7d!important;font-size:10px!important;font-weight:800!important;text-align:left!important;
