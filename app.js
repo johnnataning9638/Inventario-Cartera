@@ -978,9 +978,12 @@ function openModal(type,id){
   new FormData(e.target).forEach((v,k)=>o[k]=v===""?null:v);
   try{
     if(type==="expedientes"){
-      const idContrib=await ensureContributor(o.nit,o.razon_social);
+      const nitManual=String(o.nit||"").trim();
+      const razonManual=upper(o.razon_social||"").trim();
+      const idContrib=await ensureContributor(nitManual,razonManual);
       o.contribuyente_id=idContrib;
-      delete o.nit;delete o.razon_social;
+      o.nit=nitManual;
+      o.razon_social=razonManual;
     }else if(["titulos","pagos","actuaciones"].includes(type)){
       const idContrib=await ensureContributor(o.nit,o.razon_social);
       o.contribuyente_id=idContrib;
