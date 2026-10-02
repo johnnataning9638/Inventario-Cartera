@@ -425,6 +425,42 @@ function loadColumnWidths(){
 function saveColumnWidths(x){
  try{localStorage.setItem(COLUMN_WIDTHS_KEY,JSON.stringify(x));}catch{}
 }
+function autoFitColumn(table,th,type,key){
+ const cells=[th,...Array.from(table.querySelectorAll("tbody tr")).map(tr=>tr.children[th.cellIndex]).filter(Boolean)];
+ let maxW=70;
+ const probes=[];
+ cells.forEach(cell=>{
+   const probe=cell.cloneNode(true);
+   probe.querySelectorAll(".column-resizer,.column-filter-panel").forEach(x=>x.remove());
+   probe.querySelectorAll("input,select,textarea").forEach(el=>{
+     const span=document.createElement("span");
+     span.textContent=el.value||el.getAttribute("placeholder")||"";
+     span.style.cssText="font:inherit;display:inline-block;white-space:nowrap";
+     el.replaceWith(span);
+   });
+   probe.style.cssText="position:absolute;left:-100000px;top:-100000px;visibility:hidden!important;display:block!important;width:max-content!important;min-width:0!important;max-width:none!important;white-space:nowrap!important;overflow:visible!important;height:auto!important";
+   probe.querySelectorAll("*").forEach(el=>{
+     el.style.maxWidth="none";
+     el.style.whiteSpace="nowrap";
+     el.style.overflow="visible";
+   });
+   document.body.appendChild(probe);
+   probes.push(probe);
+   maxW=Math.max(maxW,Math.ceil(probe.getBoundingClientRect().width)+18);
+ });
+ probes.forEach(x=>x.remove());
+ maxW=Math.min(Math.max(70,maxW),900);
+ th.style.width=maxW+"px";
+ th.style.minWidth=maxW+"px";
+ table.querySelectorAll("tbody tr").forEach(tr=>{
+   const cell=tr.children[th.cellIndex];
+   if(cell){cell.style.width=maxW+"px";cell.style.minWidth=maxW+"px";}
+ });
+ const all=loadColumnWidths();
+ all[type]=all[type]||{};
+ all[type][key]=maxW;
+ saveColumnWidths(all);
+}
 function bindColumnResize(root,type){
  const table=root?.querySelector?.("table.resizable-table");
  if(!table)return;
@@ -437,6 +473,11 @@ function bindColumnResize(root,type){
    const handle=th.querySelector(".column-resizer");
    if(!handle||handle.dataset.bound==="1")return;
    handle.dataset.bound="1";
+   handle.addEventListener("dblclick",(ev)=>{
+     ev.preventDefault();
+     ev.stopPropagation();
+     autoFitColumn(table,th,type,key);
+   });
    handle.addEventListener("mousedown",(ev)=>{
      ev.preventDefault();ev.stopPropagation();
      const startX=ev.clientX,startW=th.getBoundingClientRect().width;
@@ -462,6 +503,7 @@ function bindColumnResize(root,type){
    });
  });
 }
+
 function sortHeader(type,key,label){
   const st=tableState[type]||{};
   const active=st.sortKey===key;
