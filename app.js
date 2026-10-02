@@ -143,11 +143,16 @@ async function login(e){
    $("auth").classList.add("hidden");
    $("app").classList.remove("hidden");
    $("user").textContent=currentUser.email.toUpperCase();
-   render();
+   try{
+     render();
+   }catch(viewError){
+     console.error("ERROR AL RENDERIZAR DESPUÉS DEL LOGIN",viewError);
+     $("content").innerHTML='<div class="card-body" style="padding:24px"><h3 class="section-title">ACCESO CORRECTO</h3><p>LA AUTENTICACIÓN FUE EXITOSA. SE PRESENTÓ UN ERROR AL CARGAR LA VISTA.</p><pre style="white-space:pre-wrap;font-size:11px;color:#a23">'+esc(viewError.stack||viewError.message||viewError)+'</pre></div>';
+     setMsg("ACCESO CORRECTO",false);
+   }
  }catch(x){
    console.error(x);
    setMsg(x.message||"NO FUE POSIBLE CARGAR EL INVENTARIO",true);
-   // Solo cerrar sesión cuando el inicio realmente falló; evita ciclos de entrada/salida por eventos de autenticación.
    try{await db.auth.signOut({scope:"local"});}catch{}
  }
 }
@@ -876,7 +881,12 @@ async function bootAuth(){
    $("auth").classList.add("hidden");
    $("app").classList.remove("hidden");
    $("user").textContent=currentUser.email.toUpperCase();
-   render();
+   try{
+     render();
+   }catch(viewError){
+     console.error("ERROR AL RENDERIZAR SESIÓN EXISTENTE",viewError);
+     $("content").innerHTML='<div class="card-body" style="padding:24px"><h3 class="section-title">SESIÓN VÁLIDA</h3><p>LA SESIÓN Y LA AUTORIZACIÓN SON CORRECTAS. SE PRESENTÓ UN ERROR AL CARGAR LA VISTA.</p><pre style="white-space:pre-wrap;font-size:11px;color:#a23">'+esc(viewError.stack||viewError.message||viewError)+'</pre></div>';
+   }
  }catch(e){
    console.error(e);
    await db.auth.signOut();
