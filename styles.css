@@ -263,3 +263,7 @@
 .consolidated-card .tablewrap table td:nth-child(1){min-width:125px;width:125px}
 .consolidated-card .tablewrap table th:nth-child(2),
 .consolidated-card .tablewrap table td:nth-child(2){min-width:290px;width:290px}
+
+/* MODALES SIEMPRE POR ENCIMA DE HEADER, TOOLBAR Y TABLAS */
+.modal{z-index:1000!important}
+.modalbox{position:relative;z-index:1001}
