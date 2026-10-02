@@ -397,12 +397,13 @@ function columnFilterPanel(type,key,label){
  }else if(kind==="number"){
    body='<input class="column-filter-input" type="number" placeholder="VALOR MÍNIMO" value="'+esc(f.min??"")+'" onkeydown="columnFilterKey(event,\''+type+'\',\''+key+'\')"><input class="column-filter-input" type="number" placeholder="VALOR MÁXIMO" value="'+esc(f.max??"")+'" onkeydown="columnFilterKey(event,\''+type+'\',\''+key+'\')"><button class="column-filter-apply" onclick="applyColumnFilter(\''+type+'\',\''+key+'\',this.parentElement)">APLICAR</button>';
  }else if(kind==="date"){
-   body='<input class="column-filter-input" type="date" value="'+esc(f.from??"")+'" onchange="setColumnFilterRange(\''+type+'\',\''+key+'\',\'from\',this.value)"><input class="column-filter-input" type="date" value="'+esc(f.to??"")+'" onchange="setColumnFilterRange(\''+type+'\',\''+key+'\',\'to\',this.value)">';
+   body='<input class="column-filter-input column-filter-date" type="text" inputmode="numeric" maxlength="10" placeholder="DESDE: DD MM AA" value="'+esc(f.from?displayDate(f.from):"")+'" oninput="formatColumnDateInput(this)" onblur="setColumnDateFilter(\''+type+'\',\''+key+'\',\'from\',this)"><input class="column-filter-input column-filter-date" type="text" inputmode="numeric" maxlength="10" placeholder="HASTA: DD MM AA" value="'+esc(f.to?displayDate(f.to):"")+'" oninput="formatColumnDateInput(this)" onblur="setColumnDateFilter(\''+type+'\',\''+key+'\',\'to\',this)">';
  }else{
    body='<input class="column-filter-input" type="search" placeholder="BUSCAR..." value="'+esc(f.text??"")+'" onkeydown="columnFilterKey(event,\''+type+'\',\''+key+'\')"><button class="column-filter-apply" onclick="applyColumnFilter(\''+type+'\',\''+key+'\',this.parentElement)">APLICAR</button>';
  }
  return '<div class="column-filter-panel" onclick="event.stopPropagation()"><div class="column-filter-title">'+esc(label)+'</div>'+body+'<button class="column-filter-clear" onclick="clearColumnFilter(\''+type+'\',\''+key+'\')">LIMPIAR FILTRO</button></div>';
 }
+
 function sortHeader(type,key,label){
   const st=tableState[type]||{};
   const active=st.sortKey===key;
@@ -446,6 +447,22 @@ function setColumnFilterRange(type,key,part,value){
  f[part]=value||"";
  tableState[type].filters[key]=f;
  render();
+}
+function setColumnDateFilter(type,key,part,input){
+ const raw=String(input?.value||"").trim();
+ if(!raw){setColumnFilterRange(type,key,part,"");return;}
+ const iso=isoFromDateInput(raw);
+ if(!iso){
+   if(input)input.setCustomValidity("FECHA NO VÁLIDA. USE DD MM AA, POR EJEMPLO 01 01 26.");
+   return;
+ }
+ if(input){input.setCustomValidity("");input.value=displayDate(iso);}
+ setColumnFilterRange(type,key,part,iso);
+}
+function formatColumnDateInput(input){
+ if(!input)return;
+ input.value=formatDateTyping(input.value);
+ input.setCustomValidity("");
 }
 function clearAllFilters(){
   Object.keys(tableState).forEach(type=>{
