@@ -225,8 +225,8 @@ function home(){
    const note=q?'<div class="filter-context"><b>BÚSQUEDA ACTIVA:</b> '+esc(q)+'<span>'+rows.length+' EXPEDIENTES</span></div>':"";
    const headers=[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente","EXPEDIENTE"],["cuantia","CUANTÍA"],["tipo_obligacion","TIPO OBLIGACIÓN"],["estado","ESTADO"],["gestion","GESTIÓN"],["fecha_aviso_cobro","FECHA AVISO"],["fecha_opp","FECHA OPP"],["fecha_embargo","FECHA EMBARGO"],["fecha_desembargo","FECHA DESEMBARGO"],["fecha_investigacion_bienes","FECHA INVESTIGACIÓN"],["fecha_mandamiento_pago","FECHA MANDAMIENTO"]];
    const head=headers.map(([k,h])=>sortHeader("expedientes",k,h)).join("");
-   $("content").innerHTML='<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>CONSULTA CONSOLIDADA POR NIT, RAZÓN SOCIAL Y EXPEDIENTE. LAS MODIFICACIONES SE REFLEJAN EN LAS PESTAÑAS RELACIONADAS.</p></div>'+note+'<div class="card-body consolidated-card" style="margin-top:16px"><div class="tablewrap"><table><thead><tr>'+head+'</tr></thead><tbody>'+(body||'<tr><td colspan="13" class="empty">NO HAY INFORMACIÓN PARA LA BÚSQUEDA</td></tr>')+'</tbody></table></div></div>';
-   bindInlineDateFields($("content"));
+   $("content").innerHTML='<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>CONSULTA CONSOLIDADA POR NIT, RAZÓN SOCIAL Y EXPEDIENTE. LAS MODIFICACIONES SE REFLEJAN EN LAS PESTAÑAS RELACIONADAS.</p></div>'+note+'<div class="card-body consolidated-card" style="margin-top:16px"><div class="tablewrap"><table class="resizable-table"><thead><tr>'+head+'</tr></thead><tbody>'+(body||'<tr><td colspan="13" class="empty">NO HAY INFORMACIÓN PARA LA BÚSQUEDA</td></tr>')+'</tbody></table></div></div>';
+   bindInlineDateFields($("content"));bindColumnResize($("content"),"expedientes");
  }catch(error){
    console.error("ERROR INICIO",error);
    const c=cache,total=(c.expedientes||[]).reduce((s,x)=>s+Number(x.cuantia||0),0);
@@ -418,13 +418,56 @@ function columnFilterPanel(type,key,label){
  return '<div class="column-filter-panel" onclick="event.stopPropagation()"><div class="column-filter-title">'+esc(label)+'</div>'+body+'<button class="column-filter-clear" onclick="clearColumnFilter(\''+type+'\',\''+key+'\')">LIMPIAR FILTRO</button></div>';
 }
 
+const COLUMN_WIDTHS_KEY="inventario_cartera_column_widths_v1";
+function loadColumnWidths(){
+ try{return JSON.parse(localStorage.getItem(COLUMN_WIDTHS_KEY)||"{}")||{};}catch{return {};}
+}
+function saveColumnWidths(x){
+ try{localStorage.setItem(COLUMN_WIDTHS_KEY,JSON.stringify(x));}catch{}
+}
+function bindColumnResize(root,type){
+ const table=root?.querySelector?.("table");
+ if(!table)return;
+ const widths=loadColumnWidths();
+ const saved=widths[type]||{};
+ table.querySelectorAll("thead th[data-column-key]").forEach((th)=>{
+   const key=th.dataset.columnKey;
+   if(saved[key])th.style.width=saved[key]+"px";
+   const handle=th.querySelector(".column-resizer");
+   if(!handle||handle.dataset.bound==="1")return;
+   handle.dataset.bound="1";
+   handle.addEventListener("mousedown",(ev)=>{
+     ev.preventDefault();ev.stopPropagation();
+     const startX=ev.clientX,startW=th.getBoundingClientRect().width;
+     const minW=70;
+     const move=(e)=>{
+       const w=Math.max(minW,Math.round(startW+(e.clientX-startX)));
+       th.style.width=w+"px";
+       th.style.minWidth=w+"px";
+       table.querySelectorAll("tbody tr").forEach(tr=>{
+         const cell=tr.children[th.cellIndex];
+         if(cell){cell.style.width=w+"px";cell.style.minWidth=w+"px";}
+       });
+     };
+     const up=()=>{
+       const w=Math.max(minW,Math.round(th.getBoundingClientRect().width));
+       const all=loadColumnWidths();all[type]=all[type]||{};all[type][key]=w;saveColumnWidths(all);
+       document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up);
+       document.body.classList.remove("resizing-column");
+     };
+     document.body.classList.add("resizing-column");
+     document.addEventListener("mousemove",move);
+     document.addEventListener("mouseup",up,{once:true});
+   });
+ });
+}
 function sortHeader(type,key,label){
   const st=tableState[type]||{};
   const active=st.sortKey===key;
   const arrow=active?(st.asc?" ↑":" ↓"):"";
   const activeFilter=!!st.filters?.[key]&&Object.values(st.filters[key]).some(v=>String(v??"")!=="");
   const funnel='<svg class="funnel-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path></svg>';
-  return '<th class="'+(activeFilter?"has-column-filter":"")+'"><div class="header-tools"><button class="sort-header '+(active?"active":"")+'" onclick="sortTable(\''+type+'\',\''+key+'\')">'+esc(label)+arrow+'</button><button type="button" class="filter-icon '+(activeFilter?"active":"")+'" title="FILTRAR '+esc(label)+'" aria-label="FILTRAR '+esc(label)+'" onclick="toggleColumnFilter(event,\''+type+'\',\''+key+'\')">'+funnel+'</button>'+columnFilterPanel(type,key,label)+'</div></th>';
+  return '<th data-column-key="'+esc(key)+'" class="'+(activeFilter?"has-column-filter":"")+'"><div class="header-tools"><button class="sort-header '+(active?"active":"")+'" onclick="sortTable(\''+type+'\',\''+key+'\')">'+esc(label)+arrow+'</button><button type="button" class="filter-icon '+(activeFilter?"active":"")+'" title="FILTRAR '+esc(label)+'" aria-label="FILTRAR '+esc(label)+'" onclick="toggleColumnFilter(event,\''+type+'\',\''+key+'\')">'+funnel+'</button>'+columnFilterPanel(type,key,label)+'</div><span class="column-resizer" title="AJUSTAR ANCHO"></span></th>';
 }
 function toggleColumnFilter(event,type,key){
  event.stopPropagation();
@@ -583,7 +626,7 @@ function list(type){
    catch(rowError){console.error("ERROR FILA "+type,r,rowError);return '<tr>'+fallbackRowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+safeCell(r.observaciones||r.descripcion)+'</td></tr>';}
   }).join("");
   $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button>'+activeNote+'</div><div class="tablewrap"><table><thead><tr>'+head+'<th>ACCIONES</th>'+sortHeader(type,"observaciones","OBSERVACIONES")+'</tr></thead><tbody>'+body+(rows.length?"":'<tr><td colspan="'+(headers.length+2)+'" class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</td></tr>')+'</tbody></table></div>';
-  bindInlineDateFields($("content"));
+  bindInlineDateFields($("content"));bindColumnResize($("content"),type);
  }catch(error){
   console.error("ERROR AL RENDERIZAR "+type,error);
   const headers={
