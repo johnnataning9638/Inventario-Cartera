@@ -369,7 +369,7 @@ function bindInlineDateFields(root){
  bindBulkFillShortcuts(root);
 }
 function filterKind(type,key){
- if(["cuantia","valor"].includes(key))return "number";
+ if(["cuantia","valor","total_pagos"].includes(key))return "number";
  if(["fecha","fecha_proxima","fecha_tdj","fecha_tramite","fecha_pago","fecha_aviso_cobro","fecha_opp","fecha_embargo","fecha_desembargo","fecha_investigacion_bienes","fecha_mandamiento_pago"].includes(key))return "date";
  if(["tipo_obligacion","estado","gestion","tipo","tipo_pago","aplicacion"].includes(key))return "select";
  return "text";
@@ -404,11 +404,12 @@ function columnFilterPanel(type,key,label){
  return '<div class="column-filter-panel" onclick="event.stopPropagation()"><div class="column-filter-title">'+esc(label)+'</div>'+body+'<button class="column-filter-clear" onclick="clearColumnFilter(\''+type+'\',\''+key+'\')">LIMPIAR FILTRO</button></div>';
 }
 function sortHeader(type,key,label){
- const st=tableState[type]||{};
- const active=st.sortKey===key;
- const arrow=active?(st.asc?" ↑":" ↓"):"";
- const activeFilter=!!st.filters?.[key]&&Object.values(st.filters[key]).some(v=>String(v??"")!=="");
- return '<th class="'+(activeFilter?"has-column-filter":"")+'"><div class="header-tools"><button class="sort-header" onclick="sortTable(\''+type+'\',\''+key+'\')">'+esc(label)+arrow+'</button><button class="filter-icon '+(activeFilter?"active":"")+'" title="FILTRAR '+esc(label)+'" onclick="toggleColumnFilter(event,\''+type+'\',\''+key+'\')">⌕</button>'+columnFilterPanel(type,key,label)+'</div></th>';
+  const st=tableState[type]||{};
+  const active=st.sortKey===key;
+  const arrow=active?(st.asc?" ↑":" ↓"):"";
+  const activeFilter=!!st.filters?.[key]&&Object.values(st.filters[key]).some(v=>String(v??"")!=="");
+  const funnel='<svg class="funnel-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path></svg>';
+  return '<th class="'+(activeFilter?"has-column-filter":"")+'"><div class="header-tools"><button class="sort-header '+(active?"active":"")+'" onclick="sortTable(\''+type+'\',\''+key+'\')">'+esc(label)+arrow+'</button><button type="button" class="filter-icon '+(activeFilter?"active":"")+'" title="FILTRAR '+esc(label)+'" aria-label="FILTRAR '+esc(label)+'" onclick="toggleColumnFilter(event,\''+type+'\',\''+key+'\')">'+funnel+'</button>'+columnFilterPanel(type,key,label)+'</div></th>';
 }
 function toggleColumnFilter(event,type,key){
  event.stopPropagation();
@@ -446,6 +447,16 @@ function setColumnFilterRange(type,key,part,value){
  tableState[type].filters[key]=f;
  render();
 }
+function clearAllFilters(){
+  Object.keys(tableState).forEach(type=>{
+    tableState[type].filters={};
+    tableState[type].sortKey=null;
+    tableState[type].asc=null;
+  });
+  const search=$("search");
+  if(search)search.value="";
+  render();
+}
 function clearColumnFilter(type,key){
  delete tableState[type].filters[key];
  render();
@@ -479,8 +490,15 @@ function sortValue(type,row,key){
  if(key==="nit"){const c=contrib(row.contribuyente_id);return Number(String(c?.nit||"").replace(/\D/g,""))||0;}
  if(key==="razon_social"){const c=contrib(row.contribuyente_id);return String(c?.razon_social||row.razon_social||"").toUpperCase();}
  if(["cuantia","valor"].includes(key))return Number(row[key]||0);
+  if(key==="total_pagos")return Number(columnFilterValue(type,row,key)||0);
  if(["fecha","fecha_proxima","fecha_tdj","fecha_tramite","fecha_pago","fecha_aviso_cobro","fecha_opp","fecha_embargo","fecha_desembargo","fecha_investigacion_bienes","fecha_mandamiento_pago"].includes(key))return row[key]?new Date(row[key]+"T00:00:00").getTime():-Infinity;
  return String(columnFilterValue(type,row,key)??"").toUpperCase();
+}
+function sortTable(type,key){
+  const st=tableState[type]||(tableState[type]={sortKey:null,asc:null,filters:{}});
+  if(st.sortKey===key)st.asc=st.asc===false;
+  else{st.sortKey=key;st.asc=true;}
+  render();
 }
 function sortRows(type,rows){
  const st=tableState[type];
@@ -535,7 +553,7 @@ function list(type){
    try{return '<tr>'+rowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+observationText(r)+'</td></tr>';}
    catch(rowError){console.error("ERROR FILA "+type,r,rowError);return '<tr>'+fallbackRowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+safeCell(r.observaciones||r.descripcion)+'</td></tr>';}
   }).join("");
-  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button>'+activeNote+'</div><div class="tablewrap"><table><thead><tr>'+head+'<th>ACCIONES</th>'+sortHeader(type,"observaciones","OBSERVACIONES")+'</tr></thead><tbody>'+body+(rows.length?"":'<tr><td colspan="'+(headers.length+2)+'" class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</td></tr>')+'</tbody></table></div>';
+  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button>'+activeNote+'</div><div class="tablewrap"><table><thead><tr>'+head+'<th>ACCIONES</th>'+sortHeader(type,"observaciones","OBSERVACIONES")+'</tr></thead><tbody>'+body+(rows.length?"":'<tr><td colspan="'+(headers.length+2)+'" class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</td></tr>')+'</tbody></table></div>';
   bindInlineDateFields($("content"));
  }catch(error){
   console.error("ERROR AL RENDERIZAR "+type,error);
@@ -546,7 +564,7 @@ function list(type){
    actuaciones:[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente_id","EXPEDIENTE"],["fecha","FECHA"],["tipo_obligacion","TIPO OBLIGACIÓN"],["tipo","TIPO ACTUACIÓN"],["estado","ESTADO"],["fecha_proxima","PRÓXIMA GESTIÓN"]]
   }[type]||[];
   const body=rawRows.map(r=>'<tr>'+fallbackRowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+safeCell(r.observaciones||r.descripcion)+'</td></tr>').join("");
-   $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button></div><div class="tablewrap"><table><thead><tr>'+headers.map(([k,h])=>'<th>'+esc(h)+'</th>').join("")+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+   $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button></div><div class="tablewrap"><table><thead><tr>'+headers.map(([k,h])=>'<th>'+esc(h)+'</th>').join("")+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+body+'</tbody></table></div>';
   bindInlineDateFields($("content"));
  }
 }
@@ -742,9 +760,9 @@ function consolidatedHome(q){
    return '<tr><td>'+esc(c.nit||"")+'</td><td>'+esc(c.razon||"")+'</td><td>'+esc(e.expediente||"")+'</td><td>'+esc(e.tipo_obligacion||"—")+'</td><td>'+money(e.cuantia)+'</td><td>'+inlineStatus("expedientes",e)+'</td><td>'+inlineDate("expedientes",e,"fecha_aviso_cobro")+'</td><td>'+inlineDate("expedientes",e,"fecha_opp")+'</td><td>'+inlineDate("expedientes",e,"fecha_embargo")+'</td><td>'+inlineDate("expedientes",e,"fecha_desembargo")+'</td><td>'+inlineDate("expedientes",e,"fecha_investigacion_bienes")+'</td><td>'+inlineDate("expedientes",e,"fecha_mandamiento_pago")+'</td><td>'+esc(titStates||"—")+'</td><td>'+money(pagosTotal)+'</td><td>'+esc(acts||"—")+'</td><td class="observation-cell">'+esc(obs||"—")+'</td></tr>';
  }).join("");
  const c=cache,total=c.expedientes.reduce((s,x)=>s+Number(x.cuantia||0),0),head=q?'<div class="filter-context"><b>BÚSQUEDA:</b> '+esc(q)+' <span>'+rows.length+' EXPEDIENTES RELACIONADOS</span></div>':"";
- const headers=[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente","EXPEDIENTE"],["tipo_obligacion","OBLIGACIÓN"],["cuantia","CUANTÍA"],["estado","ESTADO"],["fecha_aviso_cobro","FECHA AVISO"],["fecha_opp","FECHA OPP"],["fecha_embargo","FECHA EMBARGO"],["fecha_desembargo","FECHA DESEMBARGO"],["fecha_investigacion_bienes","FECHA INVESTIGACIÓN"],["fecha_mandamiento_pago","FECHA MANDAMIENTO DE PAGO"]];
+ const headers=[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente","EXPEDIENTE"],["tipo_obligacion","OBLIGACIÓN"],["cuantia","CUANTÍA"],["estado","ESTADO"],["fecha_aviso_cobro","FECHA AVISO"],["fecha_opp","FECHA OPP"],["fecha_embargo","FECHA EMBARGO"],["fecha_desembargo","FECHA DESEMBARGO"],["fecha_investigacion_bienes","FECHA INVESTIGACIÓN"],["fecha_mandamiento_pago","FECHA MANDAMIENTO DE PAGO"],["estados_titulos","ESTADOS TÍTULOS"],["total_pagos","TOTAL PAGOS"],["actuaciones","ACTUACIONES"],["observaciones","OBSERVACIONES"]];
  const headHtml=headers.map(([k,h])=>sortHeader("expedientes",k,h)).join("");
- return '<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>LA BÚSQUEDA SUPERIOR SE CONSERVA ENTRE PESTAÑAS Y PERMITE CONSULTAR LA INFORMACIÓN CONSOLIDADA DEL EXPEDIENTE.</p></div>'+head+'<div class="card-body consolidated-card" style="margin-top:16px"><h3 class="section-title">CONSULTA CONSOLIDADA</h3><div class="tablewrap"><table><thead><tr>'+headHtml+'<th>ESTADOS TÍTULOS</th><th>TOTAL PAGOS</th><th>ACTUACIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+(body||'<tr><td colspan="16" class="empty">NO HAY INFORMACIÓN PARA EL FILTRO</td></tr>')+'</tbody></table></div></div>';
+ return '<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>LA BÚSQUEDA SUPERIOR SE CONSERVA ENTRE PESTAÑAS Y PERMITE CONSULTAR LA INFORMACIÓN CONSOLIDADA DEL EXPEDIENTE.</p></div>'+head+'<div class="card-body consolidated-card" style="margin-top:16px"><div class="toolbar"><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button></div><h3 class="section-title">CONSULTA CONSOLIDADA</h3><div class="tablewrap"><table><thead><tr>'+headHtml+'</tr></thead><tbody>'+(body||'<tr><td colspan="16" class="empty">NO HAY INFORMACIÓN PARA EL FILTRO</td></tr>')+'</tbody></table></div></div>';
 }
 function home(){const q=$("search").value.trim();$("content").innerHTML=consolidatedHome(q);bindInlineDateFields($("content"));}
 
