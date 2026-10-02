@@ -5,10 +5,10 @@ const db=createClient(SB_URL,SB_KEY,{auth:{autoRefreshToken:true,persistSession:
 let currentUser=null,view="inicio";
 let cache={contribuyentes:[],expedientes:[],titulos:[],pagos:[],actuaciones:[],embargos:[]};
 const tableState={
- expedientes:{sortKey:null,asc:null,status:"",tipo:""},
- titulos:{sortKey:null,asc:null,status:"",tipo:""},
- pagos:{sortKey:null,asc:null,status:"",tipo:""},
- actuaciones:{sortKey:null,asc:null,status:"",tipo:""}
+ expedientes:{sortKey:null,asc:null,filters:{}},
+ titulos:{sortKey:null,asc:null,filters:{}},
+ pagos:{sortKey:null,asc:null,filters:{}},
+ actuaciones:{sortKey:null,asc:null,filters:{}}
 };
 
 const $=id=>document.getElementById(id);
@@ -361,21 +361,113 @@ function bindInlineDateFields(root){
  });
  bindBulkFillShortcuts(root);
 }
+function filterKind(type,key){
+ if(["cuantia","valor"].includes(key))return "number";
+ if(["fecha","fecha_proxima","fecha_tdj","fecha_tramite","fecha_pago","fecha_aviso_cobro","fecha_opp","fecha_embargo","fecha_desembargo","fecha_investigacion_bienes","fecha_mandamiento_pago"].includes(key))return "date";
+ if(["tipo_obligacion","estado","gestion","tipo","tipo_pago","aplicacion"].includes(key))return "select";
+ return "text";
+}
+function filterSourceValues(type,key){
+ const rows=Array.isArray(cache[type])?cache[type]:[];
+ return [...new Set(rows.map(r=>columnFilterValue(type,r,key)).map(v=>String(v??"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es",{numeric:true}));
+}
+function columnFilterValue(type,row,key){
+ if(key==="nit"){const c=contributorData(row.contribuyente_id,row);return c.nit;}
+ if(key==="razon_social"){const c=contributorData(row.contribuyente_id,row);return c.razon;}
+ if(key==="expediente_id"){return exped(row.expediente_id)?.expediente||"";}
+ if(key==="tipo_obligacion")return row.tipo_obligacion||"";
+ if(key==="observaciones")return row.observaciones||row.descripcion||"";
+ return row[key]??"";
+}
+function columnFilterPanel(type,key,label){
+ const st=tableState[type]||{filters:{}};
+ const f=st.filters?.[key]||{};
+ const kind=filterKind(type,key);
+ let body="";
+ if(kind==="select"){
+   const vals=filterSourceValues(type,key);
+   body='<select class="column-filter-select" onchange="setColumnFilter(\''+type+'\',\''+key+'\',this.value)"><option value="">TODOS</option>'+vals.map(v=>'<option value="'+esc(v)+'" '+(f.value===v?"selected":"")+'>'+esc(v)+'</option>').join("")+'</select>';
+ }else if(kind==="number"){
+   body='<input class="column-filter-input" type="number" placeholder="VALOR MÍNIMO" value="'+esc(f.min??"")+'" onkeydown="columnFilterKey(event,\''+type+'\',\''+key+'\')"><input class="column-filter-input" type="number" placeholder="VALOR MÁXIMO" value="'+esc(f.max??"")+'" onkeydown="columnFilterKey(event,\''+type+'\',\''+key+'\')"><button class="column-filter-apply" onclick="applyColumnFilter(\''+type+'\',\''+key+'\',this.parentElement)">APLICAR</button>';
+ }else if(kind==="date"){
+   body='<input class="column-filter-input" type="date" value="'+esc(f.from??"")+'" onchange="setColumnFilterRange(\''+type+'\',\''+key+'\',\'from\',this.value)"><input class="column-filter-input" type="date" value="'+esc(f.to??"")+'" onchange="setColumnFilterRange(\''+type+'\',\''+key+'\',\'to\',this.value)">';
+ }else{
+   body='<input class="column-filter-input" type="search" placeholder="BUSCAR..." value="'+esc(f.text??"")+'" onkeydown="columnFilterKey(event,\''+type+'\',\''+key+'\')"><button class="column-filter-apply" onclick="applyColumnFilter(\''+type+'\',\''+key+'\',this.parentElement)">APLICAR</button>';
+ }
+ return '<div class="column-filter-panel" onclick="event.stopPropagation()"><div class="column-filter-title">'+esc(label)+'</div>'+body+'<button class="column-filter-clear" onclick="clearColumnFilter(\''+type+'\',\''+key+'\')">LIMPIAR FILTRO</button></div>';
+}
 function sortHeader(type,key,label){
  const st=tableState[type]||{};
  const active=st.sortKey===key;
  const arrow=active?(st.asc?" ↑":" ↓"):"";
- return '<th><button class="sort-header '+(active?"active":"")+'" onclick="sortTable(\''+type+'\',\''+key+'\')">'+esc(label)+arrow+'</button></th>';
+ const activeFilter=!!st.filters?.[key]&&Object.values(st.filters[key]).some(v=>String(v??"")!=="");
+ return '<th class="'+(activeFilter?"has-column-filter":"")+'"><div class="header-tools"><button class="sort-header" onclick="sortTable(\''+type+'\',\''+key+'\')">'+esc(label)+arrow+'</button><button class="filter-icon '+(activeFilter?"active":"")+'" title="FILTRAR '+esc(label)+'" onclick="toggleColumnFilter(event,\''+type+'\',\''+key+'\')">⌕</button>'+columnFilterPanel(type,key,label)+'</div></th>';
 }
-function sortTable(type,key){
- const st=tableState[type]||{};
- if(st.sortKey!==key){
-   st.sortKey=key;
-   st.asc=(key==="cuantia"||key==="valor"||key.startsWith("fecha_")||["fecha","fecha_proxima","fecha_tdj","fecha_tramite","fecha_pago"].includes(key))?false:true;
-   if(key==="nit")st.asc=true;
- }else st.asc=!st.asc;
+function toggleColumnFilter(event,type,key){
+ event.stopPropagation();
+ document.querySelectorAll(".column-filter-panel.open").forEach(p=>p.classList.remove("open"));
+ const btn=event.currentTarget;
+ const panel=btn.parentElement.querySelector(".column-filter-panel");
+ if(panel)panel.classList.toggle("open");
+}
+function columnFilterKey(event,type,key){
+ if(event.key==="Enter"){
+   event.preventDefault();
+   applyColumnFilter(type,key,event.currentTarget.parentElement);
+ }
+}
+function applyColumnFilter(type,key,panel){
+ const kind=filterKind(type,key), f={};
+ if(kind==="number"){
+   const inputs=panel.querySelectorAll("input");
+   f.min=inputs[0]?.value||"";
+   f.max=inputs[1]?.value||"";
+ }else{
+   const input=panel.querySelector("input");
+   f.text=input?.value||"";
+ }
+ tableState[type].filters[key]=f;
  render();
 }
+function setColumnFilter(type,key,value){
+ tableState[type].filters[key]={value:String(value||"")};
+ render();
+}
+function setColumnFilterRange(type,key,part,value){
+ const f={...(tableState[type].filters[key]||{})};
+ f[part]=value||"";
+ tableState[type].filters[key]=f;
+ render();
+}
+function clearColumnFilter(type,key){
+ delete tableState[type].filters[key];
+ render();
+}
+function matchesColumnFilter(type,row,key){
+ const f=tableState[type]?.filters?.[key];
+ if(!f)return true;
+ const raw=String(columnFilterValue(type,row,key)??"").trim();
+ const kind=filterKind(type,key);
+ if(kind==="select")return !f.value||upper(raw)===upper(f.value);
+ if(kind==="text")return !f.text||raw.toUpperCase().includes(String(f.text).toUpperCase());
+ if(kind==="number"){
+   const n=Number(raw.replace(/[^0-9.-]/g,""));
+   if(f.min!==""&&Number.isFinite(Number(f.min))&&n<Number(f.min))return false;
+   if(f.max!==""&&Number.isFinite(Number(f.max))&&n>Number(f.max))return false;
+   return true;
+ }
+ if(kind==="date"){
+   const d=raw.slice(0,10);
+   if(f.from&&d<f.from)return false;
+   if(f.to&&d>f.to)return false;
+   return true;
+ }
+ return true;
+}
+function filterRows(type,rows){
+ return rows.filter(r=>Object.keys(tableState[type]?.filters||{}).every(key=>matchesColumnFilter(type,r,key)));
+}
+
 function sortValue(type,row,key){
  if(key==="nit"){const c=contrib(row.contribuyente_id);return Number(String(c?.nit||"").replace(/\D/g,""))||0;}
  if(key==="razon_social"){const c=contrib(row.contribuyente_id);return String(c?.razon_social||row.razon_social||"").toUpperCase();}
@@ -394,38 +486,7 @@ function sortRows(type,rows){
  });
  return out;
 }
-function filterOptions(type){
- const st=tableState[type]||{};
- const rows=Array.isArray(cache[type])?cache[type]:[];
- const unique=(values)=>[...new Set(values.map(x=>upper(x)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es"));
- const statusValues=unique(rows.map(x=>x.estado));
- const obligationValues=unique(rows.map(x=>x.tipo_obligacion));
- const statusList=type==="expedientes"?[...new Set([...EXPEDIENTE_STATUS,...statusValues])]:type==="titulos"?[...new Set([...TITULO_STATUS,...statusValues])]:type==="pagos"?[...new Set([...PAGO_STATUS,...statusValues])]:[...new Set([...ACTUACION_STATUS,...statusValues])];
- const statusSelect='<select class="table-filter" title="FILTRAR POR ESTADO" data-filter-type="'+esc(type)+'" data-filter-key="status" onchange="setTableFilter(this.dataset.filterType,this.dataset.filterKey,this.value)"><option value="">TODOS LOS ESTADOS</option><option value="__EMPTY__" '+(st.status==="__EMPTY__"?"selected":"")+'>SIN ESTADO</option>'+statusList.map(x=>'<option value="'+esc(x)+'" '+(st.status===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>';
- const obligationSelect='<select class="table-filter" title="FILTRAR POR TIPO DE OBLIGACIÓN" data-filter-type="'+esc(type)+'" data-filter-key="tipo" onchange="setTableFilter(this.dataset.filterType,this.dataset.filterKey,this.value)"><option value="">TODAS LAS OBLIGACIONES</option><option value="__EMPTY__" '+(st.tipo==="__EMPTY__"?"selected":"")+'>SIN TIPO OBLIGACIÓN</option>'+[...new Set([...OBLIGATION_TYPES,...obligationValues])].sort((a,b)=>a.localeCompare(b,"es")).map(x=>'<option value="'+esc(x)+'" '+(st.tipo===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>';
- const gestionSelect=type==="expedientes"?'<select class="table-filter" title="FILTRAR POR GESTIÓN" data-filter-type="expedientes" data-filter-key="gestion" onchange="setTableFilter(this.dataset.filterType,this.dataset.filterKey,this.value)"><option value="">TODAS LAS GESTIONES</option><option value="__EMPTY__" '+(st.gestion==="__EMPTY__"?"selected":"")+'>SIN GESTIÓN</option>'+EXPEDIENTE_GESTION.map(x=>'<option value="'+esc(x)+'" '+(st.gestion===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>':"";
- const actionTypeSelect=type==="actuaciones"?'<select class="table-filter" title="FILTRAR POR TIPO DE ACTUACIÓN" data-filter-type="actuaciones" data-filter-key="accion" onchange="setTableFilter(this.dataset.filterType,this.dataset.filterKey,this.value)"><option value="">TODOS LOS TIPOS DE ACTUACIÓN</option><option value="__EMPTY__" '+(st.accion==="__EMPTY__"?"selected":"")+'>SIN TIPO</option>'+unique(rows.map(x=>x.tipo)).map(x=>'<option value="'+esc(x)+'" '+(st.accion===x?"selected":"")+'>'+esc(x)+'</option>').join("")+'</select>':"";
- return '<div class="filter-group">'+statusSelect+obligationSelect+gestionSelect+actionTypeSelect+'</div>';
-}
-function setTableFilter(type,key,value){
- tableState[type][key]=String(value||"").trim()==="__EMPTY__"?"__EMPTY__":upper(value||"");
- render();
-}
-function matchesFilterValue(value,filter){
- if(!filter)return true;
- if(filter==="__EMPTY__")return !String(value??"").trim();
- return upper(value)===filter;
-}
-function filterRows(type,rows){
- const st=tableState[type]||{};
- return rows.filter(r=>{
-   if(!matchesFilterValue(r.estado,st.status))return false;
-   if(!matchesFilterValue(r.tipo_obligacion,st.tipo))return false;
-   if(type==="expedientes"&&!matchesFilterValue(r.gestion,st.gestion))return false;
-   if(type==="actuaciones"&&!matchesFilterValue(r.tipo,st.accion))return false;
-   return true;
- });
-}
+
 function rowData(type,r){
  const c=contributorData(r.contribuyente_id,r);
  if(type==="expedientes")return [esc(c.nit||"—"),esc(c.razon||"—"),esc(r.expediente),money(r.cuantia),inlineObligation(type,r),inlineStatus(type,r),inlineGestion(r),inlineDate(type,r,"fecha_aviso_cobro"),inlineDate(type,r,"fecha_opp"),inlineDate(type,r,"fecha_embargo"),inlineDate(type,r,"fecha_desembargo"),inlineDate(type,r,"fecha_investigacion_bienes"),inlineDate(type,r,"fecha_mandamiento_pago")];
@@ -467,7 +528,7 @@ function list(type){
    try{return '<tr>'+rowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+observationText(r)+'</td></tr>';}
    catch(rowError){console.error("ERROR FILA "+type,r,rowError);return '<tr>'+fallbackRowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+safeCell(r.observaciones||r.descripcion)+'</td></tr>';}
   }).join("");
-  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button>'+filterOptions(type)+activeNote+'</div><div class="tablewrap"><table><thead><tr>'+head+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+body+(rows.length?"":'<tr><td colspan="'+(headers.length+2)+'" class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</td></tr>')+'</tbody></table></div>';
+  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button>'+activeNote+'</div><div class="tablewrap"><table><thead><tr>'+head+'<th>ACCIONES</th>'+sortHeader(type,"observaciones","OBSERVACIONES")+'</tr></thead><tbody>'+body+(rows.length?"":'<tr><td colspan="'+(headers.length+2)+'" class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</td></tr>')+'</tbody></table></div>';
   bindInlineDateFields($("content"));
  }catch(error){
   console.error("ERROR AL RENDERIZAR "+type,error);
@@ -478,7 +539,7 @@ function list(type){
    actuaciones:[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["expediente_id","EXPEDIENTE"],["fecha","FECHA"],["tipo_obligacion","TIPO OBLIGACIÓN"],["tipo","TIPO ACTUACIÓN"],["estado","ESTADO"],["fecha_proxima","PRÓXIMA GESTIÓN"]]
   }[type]||[];
   const body=rawRows.map(r=>'<tr>'+fallbackRowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+safeCell(r.observaciones||r.descripcion)+'</td></tr>').join("");
-  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button>'+filterOptions(type)+'</div><div class="tablewrap"><table><thead><tr>'+headers.map(([k,h])=>'<th>'+esc(h)+'</th>').join("")+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+  $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button>'</div><div class="tablewrap"><table><thead><tr>'+headers.map(([k,h])=>'<th>'+esc(h)+'</th>').join("")+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+body+'</tbody></table></div>';
   bindInlineDateFields($("content"));
  }
 }
