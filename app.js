@@ -480,6 +480,7 @@ function list(type){
   const body=rawRows.map(r=>'<tr>'+fallbackRowData(type,r).map(x=>'<td>'+x+'</td>').join("")+'<td class="actions"><button onclick="openModal(\''+type+'\','+Number(r.id)+')">EDITAR</button><button onclick="del(\''+type+'\','+Number(r.id)+')">ELIMINAR</button></td><td class="observation-cell">'+safeCell(r.observaciones||r.descripcion)+'</td></tr>').join("");
   $("content").innerHTML='<div class="toolbar"><button onclick="openModal(\''+type+'\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\''+type+'\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\''+type+'\')">EXPORTAR XLSX</button>'+filterOptions(type)+'</div><div class="tablewrap"><table><thead><tr>'+headers.map(([k,h])=>'<th>'+esc(h)+'</th>').join("")+'<th>ACCIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+body+'</tbody></table></div>';
   bindInlineDateFields($("content"));
+  bindFixedHorizontalScroll($("content"));
  }
 }
 async function updateInlineField(type,id,column,value,control){
@@ -646,6 +647,45 @@ async function bulkFillFromFocused(event){
  }
 }
 
+function bindFixedHorizontalScroll(root){
+  const wrap=root?.querySelector?.(".tablewrap");
+  if(!wrap)return;
+  const table=wrap.querySelector("table");
+  if(!table)return;
+  const old=document.getElementById("fixed-table-xscroll");
+  if(old)old.remove();
+
+  const bar=document.createElement("div");
+  bar.id="fixed-table-xscroll";
+  bar.className="fixed-table-xscroll";
+  const track=document.createElement("div");
+  track.className="fixed-table-xscroll-track";
+  bar.appendChild(track);
+  document.body.appendChild(bar);
+
+  const syncSize=()=>{
+    track.style.width=Math.max(table.scrollWidth,wrap.clientWidth+1)+"px";
+    const overflow=table.scrollWidth>wrap.clientWidth+1;
+    bar.classList.toggle("is-active",overflow);
+    if(!overflow){wrap.scrollLeft=0;bar.scrollLeft=0;return;}
+    if(Math.abs(bar.scrollLeft-wrap.scrollLeft)>1)bar.scrollLeft=wrap.scrollLeft;
+  };
+  let syncing=false;
+  wrap.addEventListener("scroll",()=>{
+    if(syncing)return;
+    syncing=true;
+    bar.scrollLeft=wrap.scrollLeft;
+    requestAnimationFrame(()=>syncing=false);
+  },{passive:true});
+  bar.addEventListener("scroll",()=>{
+    if(syncing)return;
+    syncing=true;
+    wrap.scrollLeft=bar.scrollLeft;
+    requestAnimationFrame(()=>syncing=false);
+  },{passive:true});
+  window.addEventListener("resize",syncSize);
+  requestAnimationFrame(syncSize);
+}
 function bindBulkFillShortcuts(root){
  root.addEventListener("keydown",bulkFillFromFocused);
 }
@@ -678,7 +718,7 @@ function consolidatedHome(q){
  const headHtml=headers.map(([k,h])=>sortHeader("expedientes",k,h)).join("");
  return '<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>LA BÚSQUEDA SUPERIOR SE CONSERVA ENTRE PESTAÑAS Y PERMITE CONSULTAR LA INFORMACIÓN CONSOLIDADA DEL EXPEDIENTE.</p></div>'+head+'<div class="card-body consolidated-card" style="margin-top:16px"><div class="toolbar">'+filterOptions("expedientes")+'</div><h3 class="section-title">CONSULTA CONSOLIDADA</h3><div class="tablewrap"><table><thead><tr>'+headHtml+'<th>ESTADOS TÍTULOS</th><th>TOTAL PAGOS</th><th>ACTUACIONES</th><th>OBSERVACIONES</th></tr></thead><tbody>'+(body||'<tr><td colspan="16" class="empty">NO HAY INFORMACIÓN PARA EL FILTRO</td></tr>')+'</tbody></table></div></div>';
 }
-function home(){const q=$("search").value.trim();$("content").innerHTML=consolidatedHome(q);bindInlineDateFields($("content"));}
+function home(){const q=$("search").value.trim();$("content").innerHTML=consolidatedHome(q);bindInlineDateFields($("content"));bindFixedHorizontalScroll($("content"));}
 
 async function ensureContributor(nit,razon_social){
  const n=String(nit||"").trim();
