@@ -210,7 +210,8 @@
 .tablewrap th{padding:7px 8px;background:#eaf5fc;position:sticky;top:0;z-index:2}
 .header-tools{position:relative;display:flex;align-items:center;gap:2px;min-width:100%;box-sizing:border-box}
 .header-tools .sort-header{flex:1;min-width:0}
-.filter-icon{width:24px;height:24px;flex:0 0 24px;padding:0;margin:0;border:1px solid transparent!important;border-radius:5px!important;background:transparent!important;color:#285a7d!important;font-size:14px!important;font-weight:800!important;line-height:1;cursor:pointer;box-shadow:none!important}
+.filter-icon{width:26px;height:26px;flex:0 0 26px;padding:4px;margin:0;border:1px solid transparent!important;border-radius:5px!important;background:transparent!important;color:#285a7d!important;cursor:pointer;box-shadow:none!important;display:flex;align-items:center;justify-content:center}
+.funnel-icon{width:15px;height:15px;display:block;fill:currentColor;pointer-events:none}
 .filter-icon:hover,.filter-icon.active{background:#dff2fc!important;border-color:#b9dced!important;color:#0b628f!important}
 .column-filter-panel{position:absolute;display:none;top:calc(100% + 4px);right:0;min-width:210px;max-width:270px;padding:10px;background:#fff;border:1px solid #c9dce8;border-radius:9px;box-shadow:0 12px 28px #16466b2b;z-index:100}
 .column-filter-panel.open{display:flex;flex-direction:column;gap:7px}
