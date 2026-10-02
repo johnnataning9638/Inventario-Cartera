@@ -100,15 +100,28 @@ const contrib=id=>cache.contribuyentes.find(x=>Number(x.id)===Number(id));
 // Adaptador único para las tablas: separa NIT y razón social sin alterar el modelo de datos.
 function contributorData(id,record){
  const direct=contrib(id);
- let nit=String(record?.nit||direct?.nit||"");
- let razon=String(record?.razon_social||record?.contribuyente||direct?.razon_social||"");
- if(!direct&&nit){
-   const byNit=cache.contribuyentes.find(x=>String(x.nit||"").trim()===nit.trim());
-   if(byNit){nit=String(byNit.nit||nit);razon=String(byNit.razon_social||razon);}
+ let nit=String(record?.nit||"").trim();
+ let razon=String(record?.razon_social||record?.contribuyente||"").trim();
+ if(!nit||!razon){
+   if(direct){
+     nit=String(nit||direct.nit||"");
+     razon=String(razon||direct.razon_social||"");
+   }
  }
- if(!razon&&record?.expediente_id){
+ if((!nit||!razon)&&nit){
+   const byNit=cache.contribuyentes.find(x=>String(x.nit||"").trim()===nit.trim());
+   if(byNit){
+     nit=String(nit||byNit.nit||"");
+     razon=String(razon||byNit.razon_social||"");
+   }
+ }
+ if((!nit||!razon)&&record?.expediente_id){
    const e=exped(record.expediente_id);
-   if(e){const ec=contrib(e.contribuyente_id);nit=String(nit||ec?.nit||"");razon=String(razon||ec?.razon_social||"");}
+   const ec=e?contrib(e.contribuyente_id):null;
+   if(ec){
+     nit=String(nit||ec.nit||"");
+     razon=String(razon||ec.razon_social||"");
+   }
  }
  return {nit,razon};
 }
@@ -135,6 +148,29 @@ async function load(){
    if(r.error)throw Error("ERROR AL CARGAR "+t.toUpperCase()+": "+r.error.message);
    cache[k]=r.data||[];
  }
+ // Normalización visual: cada registro queda con NIT y razón social disponibles
+ // aunque la relación FK no sea resuelta por el render en ese momento.
+ const addContributorData=(rows)=>{
+   (rows||[]).forEach(row=>{
+     const direct=cache.contribuyentes.find(c=>Number(c.id)===Number(row.contribuyente_id));
+     if(direct){
+       row.nit=String(row.nit||direct.nit||"");
+       row.razon_social=String(row.razon_social||row.contribuyente||direct.razon_social||"");
+     }
+     if((!row.nit||!row.razon_social)&&row.expediente_id){
+       const e=cache.expedientes.find(x=>Number(x.id)===Number(row.expediente_id));
+       const ec=e?cache.contribuyentes.find(c=>Number(c.id)===Number(e.contribuyente_id)):null;
+       if(ec){
+         row.nit=String(row.nit||ec.nit||"");
+         row.razon_social=String(row.razon_social||ec.razon_social||"");
+       }
+     }
+   });
+ };
+ addContributorData(cache.expedientes);
+ addContributorData(cache.titulos);
+ addContributorData(cache.pagos);
+ addContributorData(cache.actuaciones);
 }
 
 async function login(e){
@@ -425,6 +461,31 @@ function loadColumnWidths(){
 function saveColumnWidths(x){
  try{localStorage.setItem(COLUMN_WIDTHS_KEY,JSON.stringify(x));}catch{}
 }
+function applySavedColumnWidths(table,type){
+ const widths=loadColumnWidths()[type]||{};
+ const headers=Array.from(table.querySelectorAll("thead th[data-column-key]"));
+ let colgroup=table.querySelector("colgroup[data-resize-group]");
+ if(colgroup)colgroup.remove();
+ colgroup=document.createElement("colgroup");
+ colgroup.dataset.resizeGroup="1";
+ headers.forEach((th)=>{
+   const col=document.createElement("col");
+   const w=Number(widths[th.dataset.columnKey]||0);
+   if(w>0)col.style.width=w+"px";
+   colgroup.appendChild(col);
+ });
+ table.insertBefore(colgroup,table.firstChild);
+ headers.forEach((th,idx)=>{
+   const w=Number(widths[th.dataset.columnKey]||0);
+   if(w>0){
+     th.style.width=w+"px";th.style.minWidth=w+"px";
+     table.querySelectorAll("tbody tr").forEach(tr=>{
+       const cell=tr.children[idx];
+       if(cell){cell.style.width=w+"px";cell.style.minWidth=w+"px";}
+     });
+   }
+ });
+}
 function autoFitColumn(table,th,type,key){
  const cells=[th,...Array.from(table.querySelectorAll("tbody tr")).map(tr=>tr.children[th.cellIndex]).filter(Boolean)];
  let maxW=70;
@@ -440,52 +501,38 @@ function autoFitColumn(table,th,type,key){
    });
    probe.style.cssText="position:absolute;left:-100000px;top:-100000px;visibility:hidden!important;display:block!important;width:max-content!important;min-width:0!important;max-width:none!important;white-space:nowrap!important;overflow:visible!important;height:auto!important";
    probe.querySelectorAll("*").forEach(el=>{
-     el.style.maxWidth="none";
-     el.style.whiteSpace="nowrap";
-     el.style.overflow="visible";
+     el.style.maxWidth="none";el.style.whiteSpace="nowrap";el.style.overflow="visible";
    });
-   document.body.appendChild(probe);
-   probes.push(probe);
+   document.body.appendChild(probe);probes.push(probe);
    maxW=Math.max(maxW,Math.ceil(probe.getBoundingClientRect().width)+18);
  });
  probes.forEach(x=>x.remove());
  maxW=Math.min(Math.max(70,maxW),900);
- th.style.width=maxW+"px";
- th.style.minWidth=maxW+"px";
- table.querySelectorAll("tbody tr").forEach(tr=>{
-   const cell=tr.children[th.cellIndex];
-   if(cell){cell.style.width=maxW+"px";cell.style.minWidth=maxW+"px";}
- });
- const all=loadColumnWidths();
- all[type]=all[type]||{};
- all[type][key]=maxW;
- saveColumnWidths(all);
+ const all=loadColumnWidths();all[type]=all[type]||{};all[type][key]=maxW;saveColumnWidths(all);
+ applySavedColumnWidths(table,type);
 }
 function bindColumnResize(root,type){
  const table=root?.querySelector?.("table.resizable-table");
  if(!table)return;
  table.classList.add("resizable-table");
- const widths=loadColumnWidths();
- const saved=widths[type]||{};
+ applySavedColumnWidths(table,type);
  table.querySelectorAll("thead th[data-column-key]").forEach((th)=>{
    const key=th.dataset.columnKey;
-   if(saved[key])th.style.width=saved[key]+"px";
    const handle=th.querySelector(".column-resizer");
    if(!handle||handle.dataset.bound==="1")return;
    handle.dataset.bound="1";
    handle.addEventListener("dblclick",(ev)=>{
-     ev.preventDefault();
-     ev.stopPropagation();
+     ev.preventDefault();ev.stopPropagation();
      autoFitColumn(table,th,type,key);
    });
    handle.addEventListener("mousedown",(ev)=>{
      ev.preventDefault();ev.stopPropagation();
-     const startX=ev.clientX,startW=th.getBoundingClientRect().width;
-     const minW=70;
+     const startX=ev.clientX,startW=th.getBoundingClientRect().width,minW=70;
      const move=(e)=>{
        const w=Math.max(minW,Math.round(startW+(e.clientX-startX)));
-       th.style.width=w+"px";
-       th.style.minWidth=w+"px";
+       th.style.width=w+"px";th.style.minWidth=w+"px";
+       const col=table.querySelector("colgroup[data-resize-group]")?.children[th.cellIndex];
+       if(col)col.style.width=w+"px";
        table.querySelectorAll("tbody tr").forEach(tr=>{
          const cell=tr.children[th.cellIndex];
          if(cell){cell.style.width=w+"px";cell.style.minWidth=w+"px";}
@@ -494,6 +541,7 @@ function bindColumnResize(root,type){
      const up=()=>{
        const w=Math.max(minW,Math.round(th.getBoundingClientRect().width));
        const all=loadColumnWidths();all[type]=all[type]||{};all[type][key]=w;saveColumnWidths(all);
+       applySavedColumnWidths(table,type);
        document.removeEventListener("mousemove",move);document.removeEventListener("mouseup",up);
        document.body.classList.remove("resizing-column");
      };
@@ -879,7 +927,7 @@ function consolidatedHome(q){
  const headHtml=headers.map(([k,h])=>sortHeader("expedientes",k,h)).join("");
  return '<div class="grid"><div class="stat">EXPEDIENTES<b>'+c.expedientes.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+c.titulos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+c.pagos.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div><div class="hero"><h3>CONTROL INTEGRAL DE CARTERA</h3><p>LA BÚSQUEDA SUPERIOR SE CONSERVA ENTRE PESTAÑAS Y PERMITE CONSULTAR LA INFORMACIÓN CONSOLIDADA DEL EXPEDIENTE.</p></div>'+head+'<div class="card-body consolidated-card" style="margin-top:16px"><div class="toolbar"><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button></div><h3 class="section-title">CONSULTA CONSOLIDADA</h3><div class="tablewrap"><table class="resizable-table"><thead><tr>'+headHtml+'</tr></thead><tbody>'+(body||'<tr><td colspan="16" class="empty">NO HAY INFORMACIÓN PARA EL FILTRO</td></tr>')+'</tbody></table></div></div>';
 }
-function home(){const q=$("search").value.trim();$("content").innerHTML=consolidatedHome(q);bindInlineDateFields($("content"));}
+function home(){const q=$("search").value.trim();$("content").innerHTML=consolidatedHome(q);bindInlineDateFields($("content"));bindColumnResize($("content"),"expedientes");}
 
 async function ensureContributor(nit,razon_social){
  const n=String(nit||"").trim();
