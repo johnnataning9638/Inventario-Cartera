@@ -7,7 +7,8 @@
   window.contributorData=contributorData;
 
   function applyInicioGestion(){
-    if(typeof window.view!=="undefined" && window.view!=="inicio")return;
+    const title=document.getElementById("title");
+    if(!title || String(title.textContent||"").trim().toUpperCase()!=="INICIO")return;
     const content=document.getElementById("content");
     if(!content)return;
     const table=content.querySelector("table.resizable-table");
@@ -23,7 +24,8 @@
     if(sortButton)sortButton.textContent="GESTIÓN";
     const filterButton=th.querySelector(".filter-icon");
     if(filterButton)filterButton.setAttribute("aria-label","FILTRAR GESTIÓN");
-    if(th.querySelector(".column-filter-title"))th.querySelector(".column-filter-title").textContent="GESTIÓN";
+    const filterTitle=th.querySelector(".column-filter-title");
+    if(filterTitle)filterTitle.textContent="GESTIÓN";
 
     // Sustituye únicamente los controles de esa columna por el campo GESTIÓN.
     const bodyCells=[...table.querySelectorAll("tbody tr")].map(tr=>tr.children[5]).filter(Boolean);
