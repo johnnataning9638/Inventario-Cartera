@@ -15,13 +15,11 @@
     const table=content.querySelector("table.resizable-table");
     if(!table)return;
 
-    // SOLO EN INICIO: localizar la columna cuyo texto sea ESTADO.
     const ths=[...table.querySelectorAll("thead th")];
     const th=ths.find(x=>String(x.textContent||"").replace(/\s+/g," ").trim().toUpperCase().startsWith("ESTADO"));
     if(!th)return;
     const idx=th.cellIndex;
 
-    // Cambiar encabezado y sus acciones de filtro/ordenamiento.
     th.dataset.columnKey="gestion";
     const sortButton=th.querySelector(".sort-header");
     if(sortButton){
@@ -37,7 +35,6 @@
     const filterTitle=th.querySelector(".column-filter-title");
     if(filterTitle)filterTitle.textContent="GESTIÓN";
 
-    // Cambiar el control visible de ESTADO por el control real de GESTIÓN.
     table.querySelectorAll("tbody tr").forEach(tr=>{
       const cell=tr.children[idx];
       if(!cell)return;
@@ -52,8 +49,6 @@
 
   // AUTOAJUSTE GENERAL DE COLUMNAS.
   // Se aplica a las tablas de INICIO, EXPEDIENTES, TÍTULOS/TDJ, PAGOS y ACTUACIONES.
-  // La anchura se calcula con base en el encabezado y el contenido visible, evitando
-  // columnas amontonadas sin alterar la estructura ni los datos de la aplicación.
   function autoFitTables(root){
     const scope=root||document;
     scope.querySelectorAll(".tablewrap table").forEach(table=>{
@@ -75,7 +70,6 @@
             const r=el.getBoundingClientRect();
             if(r.width)controlWidth=Math.max(controlWidth,r.width);
           });
-          // Aproximación conservadora de ancho de texto para no depender de fuentes externas.
           const textWidth=Math.min(420,Math.max(46,text.length*7.1+24));
           widths[i]=Math.max(widths[i],textWidth,controlWidth+18);
         });
@@ -89,6 +83,10 @@
         const th=header.children[i];
         const label=String(th?.innerText||"").replace(/\s+/g," ").trim().toUpperCase();
         let w=Math.round(Math.min(420,Math.max(70,widths[i])));
+        if(/OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE/.test(label)){
+          // Ancho fijo amplio para que el texto pueda mostrarse en DOS RENGLONES.
+          w=380;
+        }
         if(/^(ACCIONES|ACCIÓN)$/.test(label))w=Math.max(w,130);
         if(/^(NIT|ID|AÑO|AÑO GRAVABLE)$/.test(label))w=Math.max(90,Math.min(w,145));
         if(/^(FECHA|FECHA DE PAGO|FECHA TÍTULO|FECHA DEL TÍTULO)$/.test(label))w=Math.max(105,Math.min(w,155));
@@ -99,6 +97,26 @@
       table.style.minWidth="100%";
       table.style.tableLayout="auto";
       table.dataset.columnsAutofit="1";
+
+      // OBSERVACIONES: permitir ajuste de línea y limitar visualmente a DOS RENGLONES.
+      [...header.children].forEach((th,i)=>{
+        const label=String(th?.innerText||"").replace(/\s+/g," ").trim().toUpperCase();
+        if(!/OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE/.test(label))return;
+        table.querySelectorAll(`thead th:nth-child(${i+1}),tbody td:nth-child(${i+1})`).forEach(cell=>{
+          cell.style.whiteSpace="normal";
+          cell.style.width="380px";
+          cell.style.minWidth="380px";
+          cell.style.maxWidth="380px";
+          cell.style.lineHeight="1.35";
+          cell.style.verticalAlign="top";
+        });
+        table.querySelectorAll(`tbody td:nth-child(${i+1})`).forEach(cell=>{
+          cell.style.display="-webkit-box";
+          cell.style.webkitBoxOrient="vertical";
+          cell.style.webkitLineClamp="2";
+          cell.style.overflow="hidden";
+        });
+      });
     });
   }
   window.autoFitCarteraTables=autoFitTables;
