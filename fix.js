@@ -47,6 +47,107 @@
     });
   }
 
+  function observationIndex(table){
+    const header=table?.querySelector("thead tr");
+    if(!header)return -1;
+    return [...header.children].findIndex(th=>/^(OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE)$/.test(String(th.innerText||"").replace(/\s+/g," ").trim().toUpperCase()));
+  }
+
+  function observationStorageKey(table){
+    const title=String(document.getElementById("title")?.textContent||window.view||"cartera").replace(/\s+/g," ").trim().toUpperCase();
+    return "inventario_cartera_obs_width:"+title;
+  }
+
+  function readObservationWidth(table){
+    try{
+      const n=Number(localStorage.getItem(observationStorageKey(table))||0);
+      return Number.isFinite(n)&&n>=500?n:500;
+    }catch{return 500;}
+  }
+
+  function writeObservationWidth(table,width){
+    const w=Math.max(500,Math.round(Number(width)||500));
+    table.dataset.obsWidth=String(w);
+    try{localStorage.setItem(observationStorageKey(table),String(w));}catch{}
+    return w;
+  }
+
+  function applyObservationWidth(table,idx,width){
+    if(!table||idx<0)return;
+    const w=writeObservationWidth(table,width);
+    const colgroup=table.querySelector("colgroup[data-autofit='1']");
+    if(colgroup?.children?.[idx])colgroup.children[idx].style.width=w+"px";
+
+    const cells=table.querySelectorAll(`thead th:nth-child(${idx+1}),tbody td:nth-child(${idx+1})`);
+    cells.forEach(cell=>{
+      cell.style.width=w+"px";
+      cell.style.minWidth=w+"px";
+      cell.style.maxWidth=w+"px";
+      cell.style.whiteSpace="normal";
+      cell.style.lineHeight="1.35";
+      cell.style.fontSize="13px";
+      cell.style.verticalAlign="top";
+      cell.style.overflowWrap="anywhere";
+      cell.style.wordBreak="normal";
+      cell.style.display="table-cell";
+      cell.style.overflow="visible";
+      cell.style.height="auto";
+      cell.style.maxHeight="none";
+      cell.style.textOverflow="clip";
+      cell.style.webkitLineClamp="unset";
+      cell.style.webkitBoxOrient="initial";
+    });
+    table.querySelectorAll("tbody tr").forEach(tr=>{
+      tr.style.height="auto";
+      tr.style.minHeight="0";
+    });
+    table.style.height="auto";
+  }
+
+  function bindObservationResizer(table,idx){
+    const header=table?.querySelector("thead tr");
+    const th=header?.children?.[idx];
+    if(!th||th.dataset.obsResizeBound==="1")return;
+    th.dataset.obsResizeBound="1";
+    th.style.position="relative";
+
+    const handle=document.createElement("span");
+    handle.className="obs-column-resizer";
+    handle.setAttribute("aria-label","AMPLIAR O REDUCIR OBSERVACIONES");
+    handle.style.cssText="position:absolute;right:-4px;top:0;width:9px;height:100%;cursor:col-resize;z-index:30;touch-action:none;background:transparent;";
+    th.appendChild(handle);
+
+    let startX=0,startW=500,dragging=false;
+    const onMove=e=>{
+      if(!dragging)return;
+      const next=Math.max(500,Math.round(startW+(e.clientX-startX)));
+      applyObservationWidth(table,idx,next);
+    };
+    const onUp=()=>{
+      if(!dragging)return;
+      dragging=false;
+      document.body.style.cursor="";
+      document.body.style.userSelect="";
+      window.removeEventListener("pointermove",onMove,true);
+      window.removeEventListener("pointerup",onUp,true);
+      const col=table.querySelector("colgroup[data-autofit='1']")?.children?.[idx];
+      const thWidth=th.getBoundingClientRect().width;
+      const colWidth=col?.getBoundingClientRect?.().width||0;
+      applyObservationWidth(table,idx,Math.max(500,thWidth,colWidth));
+    };
+    handle.addEventListener("pointerdown",e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      dragging=true;
+      startX=e.clientX;
+      startW=table.dataset.obsWidth?Number(table.dataset.obsWidth):Math.max(500,th.getBoundingClientRect().width);
+      document.body.style.cursor="col-resize";
+      document.body.style.userSelect="none";
+      window.addEventListener("pointermove",onMove,true);
+      window.addEventListener("pointerup",onUp,true);
+    },true);
+  }
+
   // AUTOAJUSTE GENERAL DE COLUMNAS.
   // Se aplica a las tablas de INICIO, EXPEDIENTES, TÍTULOS/TDJ, PAGOS y ACTUACIONES.
   function autoFitTables(root){
@@ -59,10 +160,13 @@
       const count=header.children.length;
       if(!count)return;
 
+      const obsIdx=observationIndex(table);
+      const obsWidth=obsIdx>=0?readObservationWidth(table):0;
       const widths=new Array(count).fill(70);
       const maxRows=rows.slice(0,251);
       maxRows.forEach(row=>{
         [...row.children].slice(0,count).forEach((cell,i)=>{
+          if(i===obsIdx)return;
           const text=String(cell.innerText||cell.textContent||"").replace(/\s+/g," ").trim();
           const controls=cell.querySelectorAll("input,select,button");
           let controlWidth=0;
@@ -86,6 +190,7 @@
         if(/^(ACCIONES|ACCIÓN)$/.test(label))w=Math.max(w,130);
         if(/^(NIT|ID|AÑO|AÑO GRAVABLE)$/.test(label))w=Math.max(90,Math.min(w,145));
         if(/^(FECHA|FECHA DE PAGO|FECHA TÍTULO|FECHA DEL TÍTULO)$/.test(label))w=Math.max(105,Math.min(w,155));
+        if(i===obsIdx)w=obsWidth;
         col.style.width=w+"px";
       });
       if(!colgroup.parentElement)table.insertBefore(colgroup,table.firstChild);
@@ -94,77 +199,13 @@
       table.style.tableLayout="auto";
       table.dataset.columnsAutofit="1";
 
-      // OBSERVACIONES: 450 PX POR DEFECTO Y RESPETO DEL ANCHO QUE EL USUARIO AMPLÍE.
-      // Si el usuario arrastra la columna, el ancho elegido se conserva y se aplica
-      // tanto a la cabecera como a todas las celdas, para que el texto aproveche TODO
-      // el espacio disponible y se ajuste en 2-3 renglones sin reducir la fuente.
-      [...header.children].forEach((th,i)=>{
-        const label=String(th?.innerText||"").replace(/\s+/g," ").trim().toUpperCase();
-        if(!/OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE/.test(label))return;
-
-        const key="obsWidth";
-        const stored=Number(table.dataset[key]||0);
-        const col=colgroup.children[i];
-        const current=col?parseFloat(col.style.width||""):0;
-        let obsWidth;
-
-        if(stored>=450){
-          obsWidth=stored;
-        }else{
-          // NUEVO VALOR BASE SOLICITADO.
-          obsWidth=450;
-          table.dataset[key]=String(obsWidth);
-        }
-
-        // Evita que el autoajuste general vuelva a imponer 420 px sobre OBSERVACIONES.
-        if(col)col.style.width=obsWidth+"px";
-
-        table.querySelectorAll(`thead th:nth-child(${i+1}),tbody td:nth-child(${i+1})`).forEach(cell=>{
-          cell.style.whiteSpace="normal";
-          cell.style.width=obsWidth+"px";
-          cell.style.minWidth=obsWidth+"px";
-          cell.style.maxWidth=obsWidth+"px";
-          cell.style.lineHeight="1.35";
-          cell.style.fontSize="13px";
-          cell.style.verticalAlign="top";
-          cell.style.overflowWrap="break-word";
-          cell.style.wordBreak="normal";
-        });
-        table.querySelectorAll(`tbody td:nth-child(${i+1})`).forEach(cell=>{
-          cell.style.display="-webkit-box";
-          cell.style.webkitBoxOrient="vertical";
-          cell.style.webkitLineClamp="3";
-          cell.style.overflow="hidden";
-        });
-      });
+      if(obsIdx>=0){
+        applyObservationWidth(table,obsIdx,obsWidth);
+        bindObservationResizer(table,obsIdx);
+      }
     });
   }
   window.autoFitCarteraTables=autoFitTables;
-
-  // Detecta el ancho final después de que el usuario termine de arrastrar una columna.
-  // OBSERVACIONES conserva cualquier ampliación hecha manualmente y la reutiliza
-  // aunque la tabla se reconstruya, se filtre, se ordene o cambie de pestaña.
-  function rememberManualObservationWidth(target){
-    const table=target?.closest?.("table.resizable-table,.tablewrap table");
-    if(!table)return;
-    const header=table.querySelector("thead tr");
-    if(!header)return;
-    const ths=[...header.children];
-    const idx=ths.findIndex(th=>/OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE/.test(String(th.innerText||"").replace(/\s+/g," ").trim().toUpperCase()));
-    if(idx<0)return;
-    const colgroup=table.querySelector("colgroup[data-autofit='1']");
-    const col=colgroup?.children?.[idx];
-    const width=Math.round((col?.getBoundingClientRect?.().width)||ths[idx]?.getBoundingClientRect?.().width||0);
-    if(width>=450){
-      table.dataset.obsWidth=String(width);
-      table.querySelectorAll(`thead th:nth-child(${idx+1}),tbody td:nth-child(${idx+1})`).forEach(cell=>{
-        cell.style.width=width+"px";
-        cell.style.minWidth=width+"px";
-        cell.style.maxWidth=width+"px";
-      });
-    }
-    autoFitTables(table.parentElement||document);
-  }
 
   function start(){
     const content=document.getElementById("content");
@@ -184,10 +225,6 @@
     setTimeout(()=>autoFitTables(document),250);
     setTimeout(()=>autoFitTables(document),900);
     setInterval(()=>autoFitTables(document),1800);
-
-    document.addEventListener("pointerup",function(e){
-      setTimeout(()=>rememberManualObservationWidth(e.target),30);
-    },true);
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
 
