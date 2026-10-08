@@ -83,10 +83,6 @@
         const th=header.children[i];
         const label=String(th?.innerText||"").replace(/\s+/g," ").trim().toUpperCase();
         let w=Math.round(Math.min(420,Math.max(70,widths[i])));
-        if(/OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE/.test(label)){
-          // Ancho fijo amplio para que el texto pueda mostrarse en DOS RENGLONES.
-          w=380;
-        }
         if(/^(ACCIONES|ACCIÓN)$/.test(label))w=Math.max(w,130);
         if(/^(NIT|ID|AÑO|AÑO GRAVABLE)$/.test(label))w=Math.max(90,Math.min(w,145));
         if(/^(FECHA|FECHA DE PAGO|FECHA TÍTULO|FECHA DEL TÍTULO)$/.test(label))w=Math.max(105,Math.min(w,155));
@@ -98,22 +94,44 @@
       table.style.tableLayout="auto";
       table.dataset.columnsAutofit="1";
 
-      // OBSERVACIONES: permitir ajuste de línea y limitar visualmente a DOS RENGLONES.
+      // OBSERVACIONES: ancho dinámico proporcional al contenido.
+      // La columna crece para que el texto se lea en aproximadamente DOS/TRES RENGLONES,
+      // sin reducir el tamaño de la fuente ni dejar espacio vacío innecesario dentro de la celda.
       [...header.children].forEach((th,i)=>{
         const label=String(th?.innerText||"").replace(/\s+/g," ").trim().toUpperCase();
         if(!/OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE/.test(label))return;
+
+        let maxTextLength=0;
+        let maxNaturalWidth=0;
+        table.querySelectorAll(`tbody td:nth-child(${i+1})`).forEach(cell=>{
+          const text=String(cell.innerText||cell.textContent||"").replace(/\s+/g," ").trim();
+          maxTextLength=Math.max(maxTextLength,text.length);
+          const rect=cell.getBoundingClientRect();
+          if(rect.width)maxNaturalWidth=Math.max(maxNaturalWidth,rect.width);
+        });
+
+        // Aproximación para 2-3 líneas con fuente normal de tabla (13 px).
+        // Se limita para evitar que una observación excepcional domine toda la pantalla.
+        const estimated=Math.ceil((maxTextLength*7.3)/2.5)+40;
+        const obsWidth=Math.round(Math.min(900,Math.max(560,estimated,maxNaturalWidth)));
+        const col=colgroup.children[i];
+        if(col)col.style.width=obsWidth+"px";
+
         table.querySelectorAll(`thead th:nth-child(${i+1}),tbody td:nth-child(${i+1})`).forEach(cell=>{
           cell.style.whiteSpace="normal";
-          cell.style.width="380px";
-          cell.style.minWidth="380px";
-          cell.style.maxWidth="380px";
+          cell.style.width=obsWidth+"px";
+          cell.style.minWidth=obsWidth+"px";
+          cell.style.maxWidth=obsWidth+"px";
           cell.style.lineHeight="1.35";
+          cell.style.fontSize="13px";
           cell.style.verticalAlign="top";
+          cell.style.overflowWrap="break-word";
+          cell.style.wordBreak="normal";
         });
         table.querySelectorAll(`tbody td:nth-child(${i+1})`).forEach(cell=>{
           cell.style.display="-webkit-box";
           cell.style.webkitBoxOrient="vertical";
-          cell.style.webkitLineClamp="2";
+          cell.style.webkitLineClamp="3";
           cell.style.overflow="hidden";
         });
       });
