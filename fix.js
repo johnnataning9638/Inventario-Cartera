@@ -50,9 +50,59 @@
     });
   }
 
-  window.applyInicioGestion=patchInicioGestion;
+  // AUTOAJUSTE GENERAL DE COLUMNAS.
+  // Se aplica a las tablas de INICIO, EXPEDIENTES, TÍTULOS/TDJ, PAGOS y ACTUACIONES.
+  // La anchura se calcula con base en el encabezado y el contenido visible, evitando
+  // columnas amontonadas sin alterar la estructura ni los datos de la aplicación.
+  function autoFitTables(root){
+    const scope=root||document;
+    scope.querySelectorAll(".tablewrap table").forEach(table=>{
+      const rows=[...table.querySelectorAll("thead tr,tbody tr")];
+      if(!rows.length)return;
+      const header=table.querySelector("thead tr");
+      if(!header)return;
+      const count=header.children.length;
+      if(!count)return;
 
-  // INICIO se reconstruye dinámicamente. Aplicar después de cada reconstrucción.
+      const widths=new Array(count).fill(70);
+      const maxRows=rows.slice(0,251);
+      maxRows.forEach(row=>{
+        [...row.children].slice(0,count).forEach((cell,i)=>{
+          const text=String(cell.innerText||cell.textContent||"").replace(/\s+/g," ").trim();
+          const controls=cell.querySelectorAll("input,select,button");
+          let controlWidth=0;
+          controls.forEach(el=>{
+            const r=el.getBoundingClientRect();
+            if(r.width)controlWidth=Math.max(controlWidth,r.width);
+          });
+          // Aproximación conservadora de ancho de texto para no depender de fuentes externas.
+          const textWidth=Math.min(420,Math.max(46,text.length*7.1+24));
+          widths[i]=Math.max(widths[i],textWidth,controlWidth+18);
+        });
+      });
+
+      const colgroup=table.querySelector("colgroup[data-autofit='1']")||document.createElement("colgroup");
+      colgroup.dataset.autofit="1";
+      while(colgroup.children.length<count)colgroup.appendChild(document.createElement("col"));
+      while(colgroup.children.length>count)colgroup.removeChild(colgroup.lastChild);
+      [...colgroup.children].forEach((col,i)=>{
+        const th=header.children[i];
+        const label=String(th?.innerText||"").replace(/\s+/g," ").trim().toUpperCase();
+        let w=Math.round(Math.min(420,Math.max(70,widths[i])));
+        if(/^(ACCIONES|ACCIÓN)$/.test(label))w=Math.max(w,130);
+        if(/^(NIT|ID|AÑO|AÑO GRAVABLE)$/.test(label))w=Math.max(90,Math.min(w,145));
+        if(/^(FECHA|FECHA DE PAGO|FECHA TÍTULO|FECHA DEL TÍTULO)$/.test(label))w=Math.max(105,Math.min(w,155));
+        col.style.width=w+"px";
+      });
+      if(!colgroup.parentElement)table.insertBefore(colgroup,table.firstChild);
+      table.style.width="max-content";
+      table.style.minWidth="100%";
+      table.style.tableLayout="auto";
+      table.dataset.columnsAutofit="1";
+    });
+  }
+  window.autoFitCarteraTables=autoFitTables;
+
   function start(){
     const content=document.getElementById("content");
     if(content && !content.dataset.gestionObserver){
@@ -60,11 +110,17 @@
       new MutationObserver(function(){
         if(window.__gestionPatchBusy)return;
         window.__gestionPatchBusy=true;
-        try{patchInicioGestion();}finally{window.__gestionPatchBusy=false;}
+        try{
+          patchInicioGestion();
+          autoFitTables(content);
+        }finally{window.__gestionPatchBusy=false;}
       }).observe(content,{childList:true,subtree:true});
     }
     patchInicioGestion();
-    setInterval(patchInicioGestion,1000);
+    autoFitTables(document);
+    setTimeout(()=>autoFitTables(document),250);
+    setTimeout(()=>autoFitTables(document),900);
+    setInterval(()=>autoFitTables(document),1800);
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
 
