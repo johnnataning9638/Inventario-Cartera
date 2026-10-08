@@ -53,16 +53,16 @@
     return [...header.children].findIndex(th=>/^(OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE)$/.test(String(th.innerText||"").replace(/\s+/g," ").trim().toUpperCase()));
   }
 
-  // 500 PX ES EL VALOR INICIAL DE CADA APERTURA/RECONSTRUCCIÓN DE LA TABLA.
+  // 1410 PX ES EL VALOR INICIAL DE CADA APERTURA/RECONSTRUCCIÓN DE LA TABLA.
   // Si el usuario amplía OBSERVACIONES durante la sesión, el ancho manual se conserva
   // mientras esa tabla exista y el texto se adapta al 100% del ancho elegido.
   function readObservationWidth(table){
     const n=Number(table?.dataset?.obsWidth||0);
-    return Number.isFinite(n)&&n>=500?n:500;
+    return Number.isFinite(n)&&n>=1410?n:1410;
   }
 
   function writeObservationWidth(table,width){
-    const w=Math.max(500,Math.round(Number(width)||500));
+    const w=Math.max(1410,Math.round(Number(width)||1410));
     table.dataset.obsWidth=String(w);
     return w;
   }
@@ -112,10 +112,10 @@
     handle.style.cssText="position:absolute;right:-4px;top:0;width:9px;height:100%;cursor:col-resize;z-index:30;touch-action:none;background:transparent;";
     th.appendChild(handle);
 
-    let startX=0,startW=500,dragging=false;
+    let startX=0,startW=1410,dragging=false;
     const onMove=e=>{
       if(!dragging)return;
-      const next=Math.max(500,Math.round(startW+(e.clientX-startX)));
+      const next=Math.max(1410,Math.round(startW+(e.clientX-startX)));
       applyObservationWidth(table,idx,next);
     };
     const onUp=()=>{
@@ -128,14 +128,14 @@
       const col=table.querySelector("colgroup[data-autofit='1']")?.children?.[idx];
       const thWidth=th.getBoundingClientRect().width;
       const colWidth=col?.getBoundingClientRect?.().width||0;
-      applyObservationWidth(table,idx,Math.max(500,thWidth,colWidth));
+      applyObservationWidth(table,idx,Math.max(1410,thWidth,colWidth));
     };
     handle.addEventListener("pointerdown",e=>{
       e.preventDefault();
       e.stopPropagation();
       dragging=true;
       startX=e.clientX;
-      startW=table.dataset.obsWidth?Number(table.dataset.obsWidth):Math.max(500,th.getBoundingClientRect().width);
+      startW=table.dataset.obsWidth?Number(table.dataset.obsWidth):Math.max(1410,th.getBoundingClientRect().width);
       document.body.style.cursor="col-resize";
       document.body.style.userSelect="none";
       window.addEventListener("pointermove",onMove,true);
