@@ -1,7 +1,7 @@
 // PARCHE DE COMPATIBILIDAD PARA INICIO Y ATAJOS
 (function(){
   function contributorData(id){
-    const c=(window.cache&&Array.isArray(cache.contribuyentes))?cache.contribuyentes.find(x=>Number(x.id)===Number(id)):null;
+    const c=(Array.isArray(cache?.contribuyentes))?cache.contribuyentes.find(x=>Number(x.id)===Number(id)):null;
     return c?{nit:c.nit||"",razon:c.razon_social||""}:{nit:"",razon:""};
   }
   window.contributorData=contributorData;
@@ -33,7 +33,7 @@
       const old=cell.querySelector("select.inline-status[data-inline-field=\"estado\"]");
       if(!old)return;
       const id=Number(old.dataset.statusId);
-      const rec=(window.cache&&Array.isArray(cache.expedientes))?cache.expedientes.find(x=>Number(x.id)===id):null;
+      const rec=(Array.isArray(cache?.expedientes))?cache.expedientes.find(x=>Number(x.id)===id):null;
       if(!rec || typeof window.inlineGestion!=="function")return;
       cell.innerHTML=window.inlineGestion(rec);
     });
