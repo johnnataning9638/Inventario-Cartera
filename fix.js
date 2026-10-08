@@ -94,27 +94,29 @@
       table.style.tableLayout="auto";
       table.dataset.columnsAutofit="1";
 
-      // OBSERVACIONES: ancho dinámico proporcional al contenido.
-      // La columna crece para que el texto se lea en aproximadamente DOS/TRES RENGLONES,
-      // sin reducir el tamaño de la fuente ni dejar espacio vacío innecesario dentro de la celda.
+      // OBSERVACIONES: 450 PX POR DEFECTO Y RESPETO DEL ANCHO QUE EL USUARIO AMPLÍE.
+      // Si el usuario arrastra la columna, el ancho elegido se conserva y se aplica
+      // tanto a la cabecera como a todas las celdas, para que el texto aproveche TODO
+      // el espacio disponible y se ajuste en 2-3 renglones sin reducir la fuente.
       [...header.children].forEach((th,i)=>{
         const label=String(th?.innerText||"").replace(/\s+/g," ").trim().toUpperCase();
         if(!/OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE/.test(label))return;
 
-        let maxTextLength=0;
-        let maxNaturalWidth=0;
-        table.querySelectorAll(`tbody td:nth-child(${i+1})`).forEach(cell=>{
-          const text=String(cell.innerText||cell.textContent||"").replace(/\s+/g," ").trim();
-          maxTextLength=Math.max(maxTextLength,text.length);
-          const rect=cell.getBoundingClientRect();
-          if(rect.width)maxNaturalWidth=Math.max(maxNaturalWidth,rect.width);
-        });
-
-        // Aproximación para 2-3 líneas con fuente normal de tabla (13 px).
-        // Se limita para evitar que una observación excepcional domine toda la pantalla.
-        const estimated=Math.ceil((maxTextLength*7.3)/2.5)+40;
-        const obsWidth=Math.round(Math.min(900,Math.max(560,estimated,maxNaturalWidth)));
+        const key="obsWidth";
+        const stored=Number(table.dataset[key]||0);
         const col=colgroup.children[i];
+        const current=col?parseFloat(col.style.width||""):0;
+        let obsWidth;
+
+        if(stored>=450){
+          obsWidth=stored;
+        }else{
+          // NUEVO VALOR BASE SOLICITADO.
+          obsWidth=450;
+          table.dataset[key]=String(obsWidth);
+        }
+
+        // Evita que el autoajuste general vuelva a imponer 420 px sobre OBSERVACIONES.
         if(col)col.style.width=obsWidth+"px";
 
         table.querySelectorAll(`thead th:nth-child(${i+1}),tbody td:nth-child(${i+1})`).forEach(cell=>{
@@ -139,6 +141,31 @@
   }
   window.autoFitCarteraTables=autoFitTables;
 
+  // Detecta el ancho final después de que el usuario termine de arrastrar una columna.
+  // OBSERVACIONES conserva cualquier ampliación hecha manualmente y la reutiliza
+  // aunque la tabla se reconstruya, se filtre, se ordene o cambie de pestaña.
+  function rememberManualObservationWidth(target){
+    const table=target?.closest?.("table.resizable-table,.tablewrap table");
+    if(!table)return;
+    const header=table.querySelector("thead tr");
+    if(!header)return;
+    const ths=[...header.children];
+    const idx=ths.findIndex(th=>/OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE/.test(String(th.innerText||"").replace(/\s+/g," ").trim().toUpperCase()));
+    if(idx<0)return;
+    const colgroup=table.querySelector("colgroup[data-autofit='1']");
+    const col=colgroup?.children?.[idx];
+    const width=Math.round((col?.getBoundingClientRect?.().width)||ths[idx]?.getBoundingClientRect?.().width||0);
+    if(width>=450){
+      table.dataset.obsWidth=String(width);
+      table.querySelectorAll(`thead th:nth-child(${idx+1}),tbody td:nth-child(${idx+1})`).forEach(cell=>{
+        cell.style.width=width+"px";
+        cell.style.minWidth=width+"px";
+        cell.style.maxWidth=width+"px";
+      });
+    }
+    autoFitTables(table.parentElement||document);
+  }
+
   function start(){
     const content=document.getElementById("content");
     if(content && !content.dataset.gestionObserver){
@@ -157,6 +184,10 @@
     setTimeout(()=>autoFitTables(document),250);
     setTimeout(()=>autoFitTables(document),900);
     setInterval(()=>autoFitTables(document),1800);
+
+    document.addEventListener("pointerup",function(e){
+      setTimeout(()=>rememberManualObservationWidth(e.target),30);
+    },true);
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
 
