@@ -2,7 +2,6 @@
 (function(){
   const ALLOWED_EMAIL="johnnataning9638@gmail.com";
   const LIVE_URL="https://inventario-cartera-live.onrender.com";
-
   function msg(text,err=false){const el=document.getElementById("authmsg");if(el){el.textContent=String(text||"").toUpperCase();el.style.color=err?"#b33d3d":"#16704d";}}
   function escHtml(s){return String(s??"").replace(/[&<>\"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;"}[m]));}
   function setupPanel(title,html){const auth=document.getElementById("auth");if(!auth)return null;const card=auth.querySelector(".auth-card");if(!card)return null;let panel=document.getElementById("inventario-security-panel");if(!panel){panel=document.createElement("div");panel.id="inventario-security-panel";panel.className="security-panel";card.appendChild(panel);}panel.innerHTML='<h3 style="margin:14px 0 8px">'+escHtml(title)+'</h3>'+html;panel.style.display="block";return panel;}
@@ -16,6 +15,18 @@
   window.register=initialSetup;
   window.forgot=async function(){const email=window.prompt("INGRESA EL CORREO AUTORIZADO",ALLOWED_EMAIL);if(!email||email.trim().toLowerCase()!==ALLOWED_EMAIL)return msg("CORREO NO AUTORIZADO",true);try{const r=await db.auth.resetPasswordForEmail(ALLOWED_EMAIL,{redirectTo:LIVE_URL+"/?inventario-reset=1"});if(r.error)throw r.error;msg("SI EXISTE UNA CUENTA, RECIBIRÁS EL ENLACE DE RECUPERACIÓN EN EL CORREO AUTORIZADO.");}catch(e){msg(e.message||e,true);}};
   async function handleRecoverySession(session){if(!session?.user||String(session.user.email||"").toLowerCase()!==ALLOWED_EMAIL)return;setupPanel("ESTABLECER CONTRASEÑA",'<p style="font-size:13px">CREA AQUÍ TU CONTRASEÑA. NUNCA LA ENVÍES POR CHAT.</p><input id="newPass" type="password" minlength="8" placeholder="NUEVA CONTRASEÑA"><input id="newPass2" type="password" minlength="8" placeholder="CONFIRMA LA CONTRASEÑA"><button id="savePass" type="button">GUARDAR CONTRASEÑA</button>');document.getElementById("savePass").onclick=async()=>{const p=document.getElementById("newPass").value,p2=document.getElementById("newPass2").value;if(p.length<8||p!==p2)return msg("LA CONTRASEÑA DEBE TENER AL MENOS 8 CARACTERES Y COINCIDIR",true);try{const r=await db.auth.updateUser({password:p});if(r.error)throw r.error;history.replaceState({},document.title,window.location.pathname);msg("CONTRASEÑA GUARDADA. AHORA CONFIGURAREMOS MFA.");await enrollMfa(session.user);}catch(e){msg(e.message||e,true);}};}
-  async function boot(){const form=document.getElementById("login");if(form)form.onsubmit=window.login;const forgot=document.getElementById("forgot");if(forgot)forgot.onclick=window.forgot;const reg=document.getElementById("reg");if(reg){reg.style.display="inline-flex";reg.disabled=false;reg.textContent="CONFIGURAR ACCESO INICIAL";reg.onclick=window.register;}const {data}=await db.auth.getSession(),session=data?.session;if(!session)return;const email=String(session.user.email||"").toLowerCase();if(email!==ALLOWED_EMAIL){await db.auth.signOut({scope:"local"});return;}if(window.location.search.includes("inventario-reset=1")){await handleRecoverySession(session);return;}try{await handleAal1(session.user);}catch(e){console.error(e);msg(e.message||e,true);}}
-  document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,0));
+  async function boot(){
+    const form=document.getElementById("login");
+    if(form)form.onsubmit=window.login;
+    const forgot=document.getElementById("forgot");if(forgot)forgot.onclick=window.forgot;
+    const reg=document.getElementById("reg");if(reg){reg.style.display="inline-flex";reg.disabled=false;reg.textContent="CONFIGURAR ACCESO INICIAL";reg.onclick=window.register;}
+    const auth=document.getElementById("auth"),app=document.getElementById("app");
+    if(auth)auth.classList.remove("hidden");
+    if(app)app.classList.add("hidden");
+    const {data}=await db.auth.getSession(),session=data?.session;if(!session)return;
+    const email=String(session.user.email||"").toLowerCase();if(email!==ALLOWED_EMAIL){await db.auth.signOut({scope:"local"});return;}
+    if(window.location.search.includes("inventario-reset=1")){await handleRecoverySession(session);return;}
+    try{await handleAal1(session.user);}catch(e){console.error(e);msg(e.message||e,true);}
+  }
+  document.addEventListener("DOMContentLoaded",()=>setTimeout(boot,1200));
 })();
