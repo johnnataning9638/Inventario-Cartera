@@ -53,22 +53,17 @@
     return [...header.children].findIndex(th=>/^(OBSERVACIONES?|COMENTARIOS?|DESCRIPCIÓN|DESCRIPCION|DETALLE)$/.test(String(th.innerText||"").replace(/\s+/g," ").trim().toUpperCase()));
   }
 
-  function observationStorageKey(table){
-    const title=String(document.getElementById("title")?.textContent||window.view||"cartera").replace(/\s+/g," ").trim().toUpperCase();
-    return "inventario_cartera_obs_width:"+title;
-  }
-
+  // 500 PX ES EL VALOR INICIAL DE CADA APERTURA/RECONSTRUCCIÓN DE LA TABLA.
+  // Si el usuario amplía OBSERVACIONES durante la sesión, el ancho manual se conserva
+  // mientras esa tabla exista y el texto se adapta al 100% del ancho elegido.
   function readObservationWidth(table){
-    try{
-      const n=Number(localStorage.getItem(observationStorageKey(table))||0);
-      return Number.isFinite(n)&&n>=500?n:500;
-    }catch{return 500;}
+    const n=Number(table?.dataset?.obsWidth||0);
+    return Number.isFinite(n)&&n>=500?n:500;
   }
 
   function writeObservationWidth(table,width){
     const w=Math.max(500,Math.round(Number(width)||500));
     table.dataset.obsWidth=String(w);
-    try{localStorage.setItem(observationStorageKey(table),String(w));}catch{}
     return w;
   }
 
