@@ -16,8 +16,8 @@
       return NativeSetInterval(fn,delay,...args);
     };
     let wrappedAutoFit=null;
-    Object.defineProperty(window,'autoFitCarteraTables',{configurable:true,get(){return wrappedAutoFit;},set(fn){
-      if(typeof fn!=='function'){wrappedAutoFit=fn;return;}
+    Object.defineProperty(window,'autoFitCarteraTables',{configurable:true,get(){return wrappedAutoFit},set(fn){
+      if(typeof fn!=='function'){wrappedAutoFit=fn;return}
       wrappedAutoFit=function(root,force){try{if((root||document).querySelector?.('table.expedientes-table'))return}catch{}return fn(root,force)};
     }});
     const NativeMutationObserver=window.MutationObserver;
