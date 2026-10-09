@@ -1,7 +1,7 @@
-// AJUSTES DE UI Y SINCRONIZACION — VERSION 20261009.6
+// AJUSTES DE UI Y SINCRONIZACION — VERSION 20261009.7
 (function(){
   const MIN_ACTIONS_WIDTH=220;
-  const VERSION='20261009.6';
+  const VERSION='20261009.7';
   const EXP_TABLE='cartera_expedientes';
   const OBL_BASE=['RENTA','IVA','RETENCIÓN','RETENCION','HIPOCONSUMO','PATRIMONIO','RENTA CREE','VENTAS','CONSUMO','RETENCIÓN CREE','RIQUEZA','GMF','SANCION','NORMALIZACION_TRIBUTARIA','PRECIOS_DE_TRANSFERENCIA','IMPUESTO_SALUDABLE_BEBIDAS_AZUCARADAS','PRODUCTOS ULTRAPROCESADOS','PRODUCTOS PLASTICOS','SIMPLE','OTROS'];
   const TIPO_BASE=['LO','LFA','PL','LP','CP','FA'];
@@ -111,19 +111,55 @@
     const cells=table.querySelectorAll('thead th:nth-child('+(idx+1)+'),tbody td:nth-child('+(idx+1)+')');
     cells.forEach(c=>{c.style.width=width+'px';c.style.minWidth=width+'px';c.style.maxWidth=width+'px';c.style.whiteSpace='nowrap';c.style.overflow='hidden';c.style.textOverflow='clip';});
   }
-  function applyObligationMaxWidth(table){
+
+  // OBLIGACIÓN: LÍMITE ABSOLUTO DE 300 PX EN TODA LA COLUMNA.
+  // Se aplica después del autoajuste general y se reaplica periódicamente para impedir que
+  // el auto-fit, los colgroup o los filtros vuelvan a expandir la columna.
+  function applyObligationFixedWidth(table){
     if(String(view||'')!=='expedientes')return;
     const th=table?.querySelector('thead th[data-column-key="obligacion"]');if(!th)return;
-    const idx=th.cellIndex;const width=400;
+    const idx=th.cellIndex;
+    const width=300;
     const colgroup=table.querySelector('colgroup[data-resize-group]')||table.querySelector('colgroup[data-autofit="1"]');
-    if(colgroup?.children?.[idx])colgroup.children[idx].style.width=width+'px';
+    if(colgroup?.children?.[idx]){
+      colgroup.children[idx].style.width=width+'px';
+      colgroup.children[idx].style.minWidth=width+'px';
+      colgroup.children[idx].style.maxWidth=width+'px';
+    }
     const cells=table.querySelectorAll('thead th:nth-child('+(idx+1)+'),tbody td:nth-child('+(idx+1)+')');
-    cells.forEach(c=>{c.style.width=width+'px';c.style.minWidth='150px';c.style.maxWidth=width+'px';c.style.overflow='hidden';c.style.textOverflow='ellipsis';c.style.whiteSpace='nowrap';});
+    cells.forEach(c=>{
+      c.style.width=width+'px';
+      c.style.minWidth=width+'px';
+      c.style.maxWidth=width+'px';
+      c.style.boxSizing='border-box';
+      c.style.overflow='hidden';
+      c.style.textOverflow='ellipsis';
+      c.style.whiteSpace='nowrap';
+    });
+    th.style.width=width+'px';
+    th.style.minWidth=width+'px';
+    th.style.maxWidth=width+'px';
+    th.style.boxSizing='border-box';
+    const select=table.querySelectorAll('tbody tr:nth-child(n) td:nth-child('+(idx+1)+') .exp-obligacion');
+    select.forEach(s=>{
+      s.style.width='276px';
+      s.style.minWidth='276px';
+      s.style.maxWidth='276px';
+      s.style.boxSizing='border-box';
+      s.style.display='block';
+    });
+    const tools=th.querySelector('.header-tools');
+    if(tools){tools.style.width='300px';tools.style.minWidth='0';tools.style.maxWidth='300px';tools.style.boxSizing='border-box';}
+    const panel=th.querySelector('.column-filter-panel');
+    if(panel){panel.style.width='300px';panel.style.minWidth='0';panel.style.maxWidth='300px';panel.style.boxSizing='border-box';panel.style.overflowX='hidden';}
+    th.querySelectorAll('.column-filter-panel input,.column-filter-panel select,.column-filter-panel button').forEach(el=>{
+      el.style.maxWidth='100%';el.style.boxSizing='border-box';
+    });
   }
+
   function applyEstadoMaxWidth(table){
     if(String(view||'')!=='expedientes')return;
     const th=table?.querySelector('thead th[data-column-key="estado"]');if(!th)return;
-    // 326 PX DE COLUMNA = ANCHO VISUAL DEL SELECT (~302 PX) + 24 PX DE PADDING DE LA CELDA.
     const width=326,idx=th.cellIndex;
     const colgroup=table.querySelector('colgroup[data-resize-group]')||table.querySelector('colgroup[data-autofit="1"]');
     if(colgroup?.children?.[idx])colgroup.children[idx].style.width=width+'px';
@@ -132,19 +168,23 @@
   }
   function fitColumns(){
     try{if(typeof window.autoFitCarteraTables==='function')window.autoFitCarteraTables(document);}catch(e){console.error('AUTOAJUSTE',e);}
-    document.querySelectorAll('.tablewrap table').forEach(table=>{applyObservationSavedWidth(table);applyObligationMaxWidth(table);applyEstadoMaxWidth(table);});
+    document.querySelectorAll('.tablewrap table').forEach(table=>{applyObservationSavedWidth(table);applyObligationFixedWidth(table);applyEstadoMaxWidth(table);});
   }
   function scan(root){
     const scope=root||document;ensureRefreshButton();enhanceExpedientes();scope.querySelectorAll('.tablewrap table').forEach(applyActions);fitColumns();
   }
 
   function install(){
-    if(!document.getElementById('cartera-ui-20261009-6')){
-      const style=document.createElement('style');style.id='cartera-ui-20261009-6';style.textContent=`
+    if(!document.getElementById('cartera-ui-20261009-7')){
+      const style=document.createElement('style');style.id='cartera-ui-20261009-7';style.textContent=`
         .cartera-refresh-btn.is-refreshing{opacity:.72;cursor:wait;}
         .exp-enhanced-select{height:32px;min-width:105px;max-width:100%;box-sizing:border-box;border:1px solid #d4dbe3;border-radius:6px;background:#fff;padding:5px 8px;font:inherit;color:inherit;}
-        .exp-obligacion{min-width:150px;max-width:400px;width:100%;box-sizing:border-box}.exp-tipo_obl{min-width:82px}.exp-aplicativo{min-width:105px}.exp-estado{min-width:190px;max-width:100%;width:100%;box-sizing:border-box}
-        .expedientes-table th[data-column-key="obligacion"],.expedientes-table td:nth-child(4){max-width:400px;}
+        .exp-obligacion{min-width:0!important;width:276px!important;max-width:276px!important;box-sizing:border-box!important;}
+        .exp-tipo_obl{min-width:82px}.exp-aplicativo{min-width:105px}.exp-estado{min-width:190px;max-width:100%;width:100%;box-sizing:border-box}
+        .expedientes-table th[data-column-key="obligacion"],.expedientes-table td:nth-child(6){width:300px!important;min-width:300px!important;max-width:300px!important;box-sizing:border-box!important;overflow:hidden!important;}
+        .expedientes-table th[data-column-key="obligacion"] .header-tools{width:300px!important;min-width:0!important;max-width:300px!important;box-sizing:border-box!important;}
+        .expedientes-table th[data-column-key="obligacion"] .column-filter-panel{width:300px!important;min-width:0!important;max-width:300px!important;box-sizing:border-box!important;overflow-x:hidden!important;}
+        .expedientes-table th[data-column-key="obligacion"] .column-filter-panel input,.expedientes-table th[data-column-key="obligacion"] .column-filter-panel select,.expedientes-table th[data-column-key="obligacion"] .column-filter-panel button{max-width:100%!important;box-sizing:border-box!important;}
         .expedientes-table th[data-column-key="estado"],.expedientes-table td[data-column-key="estado"],.expedientes-table td:nth-child(12){width:326px!important;min-width:326px!important;max-width:326px!important;}
         .expedientes-table th[data-column-key="estado"] .header-tools{width:100%;max-width:100%;}
         .expedientes-table th[data-column-key="estado"] .column-filter-panel{max-width:100%;}
