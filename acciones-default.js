@@ -138,7 +138,7 @@
     }
     scan(document);
   }
-  function start(){install();setTimeout(install,250);setTimeout(install,900);}
+  function start(){install();setTimeout(install,250);setTimeout(install,900);setInterval(()=>scan(document),1800);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
   window.__CARTERA_UI_VERSION=VERSION;
 })();
