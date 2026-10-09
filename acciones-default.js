@@ -8,7 +8,7 @@
   const APLICATIVO_BASE=['OBLIGA','PAC'];
   const ESTADO_BASE=['AVISO DE COBRO','OFICIO PERSUASIVO PENALIZABLE','OPP','EMBARGO','DESEMBARGO','INVESTIGACIÓN DE BIENES','MANDAMIENTO DE PAGO'];
   const norm=v=>String(v??'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
-  const esc2=v=>typeof window.esc==='function'?window.esc(v):String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const esc2=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const unique=(base,rows,field)=>{const map=new Map();[...base,...(rows||[]).map(r=>r?.[field])].forEach(v=>{const s=String(v??'').trim();if(!s)return;const k=norm(s);if(!map.has(k))map.set(k,s);});return [...map.values()].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));};
   function isTargetView(){
     const title=String(document.getElementById('title')?.textContent||'').trim().toUpperCase();
@@ -37,7 +37,7 @@
   }
 
   function optionHtml(field,current){
-    const rows=Array.isArray(window.cache?.expedientes)?window.cache.expedientes:[];
+    const rows=Array.isArray(cache?.expedientes)?cache.expedientes:[];
     const base=field==='obligacion'?OBL_BASE:field==='tipo_obl'?TIPO_BASE:field==='aplicativo'?APLICATIVO_BASE:ESTADO_BASE;
     const vals=field==='estado'?base:unique(base,rows,field);
     const cur=String(current??'').trim();
@@ -47,17 +47,17 @@
     return html;
   }
   async function saveExpField(id,field,value,select){
-    const rec=(window.cache?.expedientes||[]).find(r=>Number(r.id)===Number(id));if(!rec)return;
+    const rec=(cache?.expedientes||[]).find(r=>Number(r.id)===Number(id));if(!rec)return;
     const prev=rec[field]??'',next=String(value??'').trim();
     if(select)select.disabled=true;
     try{
-      const q=await window.db.from(EXP_TABLE).update({[field]:next||null}).eq('id',Number(id)).eq('user_id',window.currentUser.id);
+      const q=await db.from(EXP_TABLE).update({[field]:next||null}).eq('id',Number(id)).eq('user_id',currentUser.id);
       if(q.error)throw q.error;rec[field]=next||null;
     }catch(e){if(select)select.value=prev;alert('NO SE PUDO ACTUALIZAR '+field.toUpperCase()+': '+(e.message||e));}
     finally{if(select)select.disabled=false;}
   }
   function enhanceExpedientes(){
-    if(String(window.view||'')!=='expedientes')return;
+    if(String(view||'')!=='expedientes')return;
     const root=document.getElementById('content');const table=root?.querySelector('table.expedientes-table');if(!table)return;
     ['obligacion','tipo_obl','aplicativo','estado'].forEach(field=>{
       const th=table.querySelector('th[data-column-key="'+CSS.escape(field)+'"]');if(!th)return;
@@ -65,7 +65,7 @@
       table.querySelectorAll('tbody tr').forEach(tr=>{
         const td=tr.children[idx];if(!td||td.dataset.enhancedSelect==='1')return;
         const exp=String(tr.dataset.expediente||'');
-        const rec=(window.cache?.expedientes||[]).find(r=>String(r.expediente||'')===exp);if(!rec)return;
+        const rec=(cache?.expedientes||[]).find(r=>String(r.expediente||'')===exp);if(!rec)return;
         const select=document.createElement('select');select.className='exp-enhanced-select exp-'+field;select.dataset.id=String(rec.id);select.dataset.field=field;select.innerHTML=optionHtml(field,rec[field]);
         select.addEventListener('change',()=>saveExpField(rec.id,field,select.value,select));
         td.textContent='';td.appendChild(select);td.dataset.enhancedSelect='1';
@@ -79,9 +79,9 @@
     const original=button?.textContent||'ACTUALIZAR';
     if(button){button.disabled=true;button.textContent='ACTUALIZANDO...';button.classList.add('is-refreshing');}
     try{
-      await window.load();
-      if(String(window.view||'')==='inicio'&&typeof window.refreshInicio==='function')await window.refreshInicio();
-      else if(typeof window.render==='function')window.render();
+      await load();
+      if(String(view||'')==='inicio'&&typeof window.refreshInicio==='function')await window.refreshInicio();
+      else render();
       setTimeout(()=>{enhanceExpedientes();scan(document);},80);
     }catch(e){console.error('ERROR AL ACTUALIZAR INVENTARIO',e);alert('NO SE PUDO ACTUALIZAR LA INFORMACIÓN: '+(e.message||e));}
     finally{if(button){button.disabled=false;button.textContent=original;button.classList.remove('is-refreshing');}window.__carteraRefreshing=false;}
@@ -105,7 +105,7 @@
   function savedWidths(){try{return JSON.parse(localStorage.getItem('inventario_cartera_column_widths_v1')||'{}')||{};}catch{return {};}}
   function applyObservationSavedWidth(table){
     const idx=observationIndex(table);if(idx<0)return;
-    const type=String(window.view||'');const all=savedWidths();const saved=Number(all?.[type]?.observaciones||0);const width=saved>=70?saved:1410;
+    const type=String(view||'');const all=savedWidths();const saved=Number(all?.[type]?.observaciones||0);const width=saved>=70?saved:1410;
     const colgroup=table.querySelector('colgroup[data-resize-group]')||table.querySelector('colgroup[data-autofit="1"]');
     if(colgroup?.children?.[idx])colgroup.children[idx].style.width=width+'px';
     const cells=table.querySelectorAll('thead th:nth-child('+(idx+1)+'),tbody td:nth-child('+(idx+1)+')');
