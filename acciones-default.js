@@ -1,7 +1,7 @@
-// AJUSTES DE UI Y SINCRONIZACION — VERSION 20261009.4
+// AJUSTES DE UI Y SINCRONIZACION — VERSION 20261009.5
 (function(){
   const MIN_ACTIONS_WIDTH=220;
-  const VERSION='20261009.4';
+  const VERSION='20261009.5';
   const EXP_TABLE='cartera_expedientes';
   const OBL_BASE=['RENTA','IVA','RETENCIÓN','RETENCION','HIPOCONSUMO','PATRIMONIO','RENTA CREE','VENTAS','CONSUMO','RETENCIÓN CREE','RIQUEZA','GMF','SANCION','NORMALIZACION_TRIBUTARIA','PRECIOS_DE_TRANSFERENCIA','IMPUESTO_SALUDABLE_BEBIDAS_AZUCARADAS','PRODUCTOS ULTRAPROCESADOS','PRODUCTOS PLASTICOS','SIMPLE','OTROS'];
   const TIPO_BASE=['LO','LFA','PL','LP','CP','FA'];
@@ -111,20 +111,30 @@
     const cells=table.querySelectorAll('thead th:nth-child('+(idx+1)+'),tbody td:nth-child('+(idx+1)+')');
     cells.forEach(c=>{c.style.width=width+'px';c.style.minWidth=width+'px';c.style.maxWidth=width+'px';c.style.whiteSpace='nowrap';c.style.overflow='hidden';c.style.textOverflow='clip';});
   }
+  function applyObligationMaxWidth(table){
+    if(String(view||'')!=='expedientes')return;
+    const th=table?.querySelector('thead th[data-column-key="obligacion"]');if(!th)return;
+    const idx=th.cellIndex;const width=400;
+    const colgroup=table.querySelector('colgroup[data-resize-group]')||table.querySelector('colgroup[data-autofit="1"]');
+    if(colgroup?.children?.[idx])colgroup.children[idx].style.width=width+'px';
+    const cells=table.querySelectorAll('thead th:nth-child('+(idx+1)+'),tbody td:nth-child('+(idx+1)+')');
+    cells.forEach(c=>{c.style.width=width+'px';c.style.minWidth='150px';c.style.maxWidth=width+'px';c.style.overflow='hidden';c.style.textOverflow='ellipsis';c.style.whiteSpace='nowrap';});
+  }
   function fitColumns(){
     try{if(typeof window.autoFitCarteraTables==='function')window.autoFitCarteraTables(document);}catch(e){console.error('AUTOAJUSTE',e);}
-    document.querySelectorAll('.tablewrap table').forEach(table=>applyObservationSavedWidth(table));
+    document.querySelectorAll('.tablewrap table').forEach(table=>{applyObservationSavedWidth(table);applyObligationMaxWidth(table);});
   }
   function scan(root){
     const scope=root||document;ensureRefreshButton();enhanceExpedientes();scope.querySelectorAll('.tablewrap table').forEach(applyActions);fitColumns();
   }
 
   function install(){
-    if(!document.getElementById('cartera-ui-20261009-4')){
-      const style=document.createElement('style');style.id='cartera-ui-20261009-4';style.textContent=`
+    if(!document.getElementById('cartera-ui-20261009-5')){
+      const style=document.createElement('style');style.id='cartera-ui-20261009-5';style.textContent=`
         .cartera-refresh-btn.is-refreshing{opacity:.72;cursor:wait;}
         .exp-enhanced-select{height:32px;min-width:105px;max-width:100%;box-sizing:border-box;border:1px solid #d4dbe3;border-radius:6px;background:#fff;padding:5px 8px;font:inherit;color:inherit;}
-        .exp-obligacion{min-width:150px}.exp-tipo_obl{min-width:82px}.exp-aplicativo{min-width:105px}.exp-estado{min-width:190px}
+        .exp-obligacion{min-width:150px;max-width:400px;width:100%;box-sizing:border-box}.exp-tipo_obl{min-width:82px}.exp-aplicativo{min-width:105px}.exp-estado{min-width:190px}
+        .expedientes-table th[data-column-key="obligacion"],.expedientes-table td:nth-child(4){max-width:400px;}
         .expedientes-table td:nth-child(19) input{width:100%;min-width:0;box-sizing:border-box;}
       `;document.head.appendChild(style);
     }
