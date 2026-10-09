@@ -1,6 +1,6 @@
 /* INVENTARIO DE CARTERA — ACCIONES DE INICIO */
 (function(){
-  const TOOLBAR_VERSION="20261009.2";
+  const TOOLBAR_VERSION="20261009.3";
   const ESTADOS=["PENDIENTE","PROCESO","TERMINADO","DEVUELTO"];
   const HEADERS=[["nit","NIT"],["expediente","EXPEDIENTE"],["razon_social","RAZÓN SOCIAL"],["fecha_prescripcion","FECHA PRESCRIPCIÓN"],["estado","ESTADO"],["observaciones","OBSERVACIONES"]];
   const norm=v=>String(v??"").trim().toUpperCase();
@@ -40,11 +40,10 @@
     `;document.head.appendChild(style);
   }
   function currentRows(){
-    const q=$("search")?.value?.trim()||"";
     return cache.inicio||[];
   }
   function toolbarHtml(rows){
-    return '<div class="toolbar inicio-toolbar"><button type="button" onclick="inicioNuevo()">+ NUEVO</button><button type="button" class="alt" onclick="importInicioXlsx()">IMPORTAR XLSX</button><button type="button" class="alt" onclick="exportInicioXlsx()">EXPORTAR XLSX</button><button type="button" class="alt clear-filters-btn" onclick="clearInicioFilters()">LIMPIAR FILTROS</button><span class="muted">'+rows.length+' REGISTROS</span></div>';
+    return '<div class="toolbar inicio-toolbar" data-inicio-toolbar-version="'+TOOLBAR_VERSION+'"><button type="button" onclick="inicioNuevo()">+ NUEVO</button><button type="button" class="alt" onclick="importInicioXlsx()">IMPORTAR XLSX</button><button type="button" class="alt" onclick="exportInicioXlsx()">EXPORTAR XLSX</button><button type="button" class="alt clear-filters-btn" onclick="clearInicioFilters()">LIMPIAR FILTROS</button><span class="muted">'+rows.length+' REGISTROS</span></div>';
   }
   function patchInicioToolbar(){
     const title=$("title"),content=$("content");if(!title||!content||norm(title.textContent)!=="INICIO")return;
@@ -52,9 +51,10 @@
     const table=card.querySelector(".inicio-table");if(!table)return;
     ensureStyle();const old=card.querySelector(".inicio-toolbar");const rows=currentRows();
     if(!old){const first=card.querySelector(".toolbar");if(first)first.outerHTML=toolbarHtml(rows);else card.insertAdjacentHTML("afterbegin",toolbarHtml(rows));}
-    else{const count=old.querySelector(".muted"),text=rows.length+" REGISTROS";if(count&&count.textContent!==text)count.textContent=text;}
+    else{old.dataset.inicioToolbarVersion=TOOLBAR_VERSION;const count=old.querySelector(".muted"),text=rows.length+" REGISTROS";if(count&&count.textContent!==text)count.textContent=text;}
     const wrap=card.querySelector(".tablewrap");
     if(wrap){wrap.classList.add("inicio-scroll-wrap");wrap.style.overflowX="auto";wrap.style.overflowY="auto";wrap.style.height="calc(450px - 78px)";wrap.style.maxHeight="none";table.style.minWidth="1215px";table.style.width="max-content";}
+    window.__INICIO_TOOLBAR_READY__=true;
   }
   function makeNuevoModal(){
     let modal=document.getElementById("inicio-nuevo-modal");if(modal)return modal;
