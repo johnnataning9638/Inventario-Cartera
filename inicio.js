@@ -1,8 +1,7 @@
-/* INVENTARIO DE CARTERA — VISTA INICIO — VERSION 20261009.3 */
+/* INVENTARIO DE CARTERA — VISTA INICIO — VERSION 20261009.4 */
 (function(){
-  const INICIO_VERSION="20261009.3";
-  /* IMPORTANTE: reutilizar el cliente autenticado de app.js. Crear un segundo cliente
-     con persistSession:false elimina la sesión para RLS y devuelve 0 registros. */
+  const INICIO_VERSION="20261009.4";
+  /* Reutilizar el cliente autenticado de app.js para conservar la sesión RLS. */
   const inicioDb=db;
   window.__inicioRows=[];
   tableState.inicio={sortKey:null,asc:null,filters:{}};
@@ -40,13 +39,20 @@
   function inicioObs(r){
     return '<input class="inicio-obs-edit" data-id="'+r.id+'" value="'+esc(r.observaciones||"")+'" placeholder="OBSERVACIONES">';
   }
+  function inicioIndicators(){
+    const e=Array.isArray(cache.expedientes)?cache.expedientes:[];
+    const t=Array.isArray(cache.titulos)?cache.titulos:[];
+    const p=Array.isArray(cache.pagos)?cache.pagos:[];
+    const total=e.reduce((s,x)=>s+Number(x.cuantia||0),0);
+    return '<div class="grid inicio-indicators"><div class="stat">EXPEDIENTES<b>'+e.length+'</b><span class="muted">EN CARTERA</span></div><div class="stat">TÍTULOS / TDJ<b>'+t.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">PAGOS<b>'+p.length+'</b><span class="muted">REGISTRADOS</span></div><div class="stat">CUANTÍA TOTAL<b>'+money(total)+'</b><span class="muted">VALOR EN CARTERA</span></div></div>';
+  }
   function renderInicio(){
     const q=$("search").value.trim();
     const rows=inicioSort(inicioSearch(cache.inicio||[],q));
     const headHtml=INICIO_HEADERS.map(([k,h])=>sortHeader("inicio",k,h)).join("");
     const body=rows.map(r=>'<tr><td>'+esc(r.nit||"")+'</td><td>'+esc(r.expediente||"")+'</td><td>'+esc(r.razon_social||"")+'</td><td>'+inicioCellInputDate(r)+'</td><td>'+inicioStatus(r)+'</td><td>'+inicioObs(r)+'</td></tr>').join('');
     const context=q?'<div class="filter-context"><b>BÚSQUEDA:</b> '+esc(q)+' <span>'+rows.length+' REGISTROS</span></div>':'';
-    $("content").innerHTML='<div class="card-body inicio-card"><div class="toolbar"><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button><span class="muted">'+rows.length+' REGISTROS</span></div>'+context+'<div class="tablewrap"><table class="resizable-table inicio-table"><thead><tr>'+headHtml+'</tr></thead><tbody>'+(body||'<tr><td colspan="6" class="empty">NO HAY INFORMACIÓN PARA EL FILTRO</td></tr>')+'</tbody></table></div></div>';
+    $("content").innerHTML=inicioIndicators()+'<div class="card-body inicio-card"><div class="toolbar"><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button><span class="muted">'+rows.length+' REGISTROS</span></div>'+context+'<div class="tablewrap"><table class="resizable-table inicio-table"><thead><tr>'+headHtml+'</tr></thead><tbody>'+(body||'<tr><td colspan="6" class="empty">NO HAY INFORMACIÓN PARA EL FILTRO</td></tr>')+'</tbody></table></div></div>';
     bindDateFields($("content"));
     bindColumnResize($("content"),"inicio");
     $("content").querySelectorAll(".inicio-status-edit").forEach(el=>el.addEventListener("change",()=>updateInicio(el.dataset.id,{estado:el.value})));
@@ -84,6 +90,6 @@
   window.refreshInicio=async function(){await loadInicio();renderInicio();};
   const style=document.createElement("style");
   style.setAttribute("data-inicio-version",INICIO_VERSION);
-  style.textContent='.inicio-card{height:450px;min-height:450px;overflow:hidden}.inicio-table th:nth-child(1),.inicio-table td:nth-child(1){min-width:125px}.inicio-table th:nth-child(2),.inicio-table td:nth-child(2){min-width:130px}.inicio-table th:nth-child(3),.inicio-table td:nth-child(3){min-width:330px}.inicio-table th:nth-child(4),.inicio-table td:nth-child(4){min-width:175px}.inicio-table th:nth-child(5),.inicio-table td:nth-child(5){min-width:155px}.inicio-table th:nth-child(6),.inicio-table td:nth-child(6){min-width:300px}.inicio-status-edit,.inicio-obs-edit,.inicio-edit-date{width:100%;box-sizing:border-box;background:#fff;border:1px solid #d4dbe3;border-radius:6px;padding:7px 8px;font:inherit;color:inherit}.inicio-obs-edit{text-transform:uppercase}.inicio-date-edit{display:flex;gap:5px}.inicio-date-edit .date-picker{width:38px;min-width:38px}.inicio-date-edit .inicio-edit-date{min-width:0}.inicio-card .tablewrap{height:calc(450px - 78px);max-height:none;overflow:auto}.inicio-card .tablewrap table{width:100%;min-width:1215px}.inicio-card td{vertical-align:middle}';
+  style.textContent='.inicio-indicators{margin-bottom:16px}.inicio-card{height:450px;min-height:450px;overflow:hidden}.inicio-table th:nth-child(1),.inicio-table td:nth-child(1){min-width:125px}.inicio-table th:nth-child(2),.inicio-table td:nth-child(2){min-width:130px}.inicio-table th:nth-child(3),.inicio-table td:nth-child(3){min-width:330px}.inicio-table th:nth-child(4),.inicio-table td:nth-child(4){min-width:175px}.inicio-table th:nth-child(5),.inicio-table td:nth-child(5){min-width:155px}.inicio-table th:nth-child(6),.inicio-table td:nth-child(6){min-width:300px}.inicio-status-edit,.inicio-obs-edit,.inicio-edit-date{width:100%;box-sizing:border-box;background:#fff;border:1px solid #d4dbe3;border-radius:6px;padding:7px 8px;font:inherit;color:inherit}.inicio-obs-edit{text-transform:uppercase}.inicio-date-edit{display:flex;gap:5px}.inicio-date-edit .date-picker{width:38px;min-width:38px}.inicio-date-edit .inicio-edit-date{min-width:0}.inicio-card .tablewrap{height:calc(450px - 78px);max-height:none;overflow:auto}.inicio-card .tablewrap table{width:100%;min-width:1215px}.inicio-card td{vertical-align:middle}';
   document.head.appendChild(style);
 })();
