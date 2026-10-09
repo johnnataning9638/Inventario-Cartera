@@ -6,27 +6,19 @@
    obsolete cartera_acceso INSERT path. The real session is returned from the second call,
    which is used by the controlled MFA flow. This does not alter database/RLS permissions. */
 (function(){
-  /* PERFORMANCE GUARD: Expedientes has a large data set. Never run the legacy global
-     auto-fit over that table during sort/filter/render cycles. Inicio uses fixed logical
-     widths and remains untouched. */
+  /* PERFORMANCE GUARD: Expedientes uses its own ultra renderer. Keep the legacy global
+     auto-fit away from this table; Inicio keeps its existing renderer untouched. */
   if(!window.__CARTERA_PERF_GUARD__){
     window.__CARTERA_PERF_GUARD__=true;
     const NativeSetInterval=window.setInterval.bind(window);
     window.setInterval=function(fn,delay,...args){
-      try{
-        const src=Function.prototype.toString.call(fn);
-        if(/autoFitTables\(document\)/.test(src)||/scan\(document\)/.test(src))return NativeSetInterval(()=>{},60000,...args);
-      }catch{}
+      try{const src=Function.prototype.toString.call(fn);if(/autoFitTables\(document\)/.test(src)||/scan\(document\)/.test(src))return NativeSetInterval(()=>{},60000,...args)}catch{}
       return NativeSetInterval(fn,delay,...args);
     };
     let wrappedAutoFit=null;
     Object.defineProperty(window,'autoFitCarteraTables',{configurable:true,get(){return wrappedAutoFit;},set(fn){
       if(typeof fn!=='function'){wrappedAutoFit=fn;return;}
-      wrappedAutoFit=function(root,force){
-        try{if((root||document).querySelector?.('table.expedientes-table'))return;}
-        catch{}
-        return fn(root,force);
-      };
+      wrappedAutoFit=function(root,force){try{if((root||document).querySelector?.('table.expedientes-table'))return}catch{}return fn(root,force)};
     }});
     const NativeMutationObserver=window.MutationObserver;
     if(NativeMutationObserver){
@@ -40,16 +32,16 @@
       };
       window.MutationObserver.prototype=NativeMutationObserver.prototype;
     }
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadExpedientesFastUI);else loadExpedientesFastUI();
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadExpedientesUltraUI);else loadExpedientesUltraUI();
   }
-  function loadExpedientesFastUI(){
-    if(window.__EXPEDIENTES_FAST_LOADER__)return;
-    window.__EXPEDIENTES_FAST_LOADER__=true;
+  function loadExpedientesUltraUI(){
+    if(window.__EXPEDIENTES_ULTRA_LOADER__)return;
+    window.__EXPEDIENTES_ULTRA_LOADER__=true;
     const s=document.createElement('script');
-    s.src='expedientes-fast.js?v=20261009.1';
+    s.src='expedientes-ultra.js?v=20261009.2';
     s.async=false;
-    s.onload=()=>console.info('[INVENTARIO] CAPA EXPEDIENTES FAST UI CARGADA.');
-    s.onerror=e=>console.warn('[INVENTARIO] NO SE PUDO CARGAR LA CAPA EXPEDIENTES FAST UI',e);
+    s.onload=()=>console.info('[INVENTARIO] CAPA EXPEDIENTES ULTRA CARGADA.');
+    s.onerror=e=>console.warn('[INVENTARIO] NO SE PUDO CARGAR LA CAPA EXPEDIENTES ULTRA',e);
     document.head.appendChild(s);
   }
   const TARGET_URL="https://wwkcgspbarhbhcbayerw.supabase.co";
