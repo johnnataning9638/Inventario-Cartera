@@ -1,6 +1,6 @@
-/* INVENTARIO DE CARTERA — TOOLBAR INICIO — VERSION 20261009.4 */
+/* INVENTARIO DE CARTERA — TOOLBAR INICIO — VERSION 20261009.5 */
 (function(){
-  const TOOLBAR_VERSION="20261009.4";
+  const TOOLBAR_VERSION="20261009.5";
   const ESTADOS=["PENDIENTE","PROCESO","TERMINADO","DEVUELTO"];
   const norm=v=>String(v??"").trim().toUpperCase();
   const toIso=v=>{if(v===null||v===undefined||v==="")return "";if(typeof v==="number"&&window.XLSX?.SSF){try{const d=XLSX.SSF.parse_date_code(v);if(d?.y&&d?.m&&d?.d)return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;}catch{}}const s=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);if(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}$/.test(s)||/^\d{6,8}$/.test(s))return isoFromDateInput(s);return "";};
@@ -10,8 +10,9 @@
       .inicio-toolbar button{white-space:nowrap!important;}
       .inicio-card .inicio-scroll-wrap{margin-top:60px!important;width:100%!important;overflow-x:auto!important;overflow-y:auto!important;height:calc(450px - 78px)!important;max-height:none!important;position:relative!important;z-index:21!important;scrollbar-gutter:stable!important;}
       .inicio-card .inicio-scroll-wrap .inicio-table{min-width:1245px!important;width:max-content!important;}
-      .inicio-card .inicio-table th:nth-child(5),.inicio-card .inicio-table td:nth-child(5){min-width:185px!important;width:185px!important;}
-      .inicio-card .inicio-status-edit{min-width:165px!important;width:100%!important;white-space:nowrap!important;text-overflow:clip!important;overflow:visible!important;}
+      .inicio-card .inicio-table th:nth-child(5),.inicio-card .inicio-table td:nth-child(5){min-width:195px!important;width:195px!important;}
+      .inicio-card .inicio-status-edit{min-width:175px!important;width:100%!important;height:32px!important;box-sizing:border-box!important;padding:0 30px 0 10px!important;font-size:11px!important;line-height:30px!important;font-family:inherit!important;white-space:nowrap!important;text-overflow:clip!important;overflow:visible!important;vertical-align:middle!important;display:block!important;}
+      .inicio-card .inicio-table td:nth-child(5){padding-top:3px!important;padding-bottom:3px!important;vertical-align:middle!important;}
       .inicio-card .inicio-scroll-wrap::-webkit-scrollbar{height:14px;width:12px;}
       .inicio-card .inicio-scroll-wrap::-webkit-scrollbar-track{background:#edf3f7;border-radius:8px;}
       .inicio-card .inicio-scroll-wrap::-webkit-scrollbar-thumb{background:#9eabb5;border-radius:8px;border:3px solid #edf3f7;}
