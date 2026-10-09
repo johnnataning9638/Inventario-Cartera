@@ -1,35 +1,22 @@
 /* INVENTARIO DE CARTERA — ACCIONES DE INICIO */
 (function(){
-  const TOOLBAR_VERSION="20261009.1";
+  const TOOLBAR_VERSION="20261009.2";
   const ESTADOS=["PENDIENTE","PROCESO","TERMINADO","DEVUELTO"];
-  const HEADERS=[
-    ["nit","NIT"],["expediente","EXPEDIENTE"],["razon_social","RAZÓN SOCIAL"],
-    ["fecha_prescripcion","FECHA PRESCRIPCIÓN"],["estado","ESTADO"],["observaciones","OBSERVACIONES"]
-  ];
-
+  const HEADERS=[["nit","NIT"],["expediente","EXPEDIENTE"],["razon_social","RAZÓN SOCIAL"],["fecha_prescripcion","FECHA PRESCRIPCIÓN"],["estado","ESTADO"],["observaciones","OBSERVACIONES"]];
   const norm=v=>String(v??"").trim().toUpperCase();
   const iso=v=>{
     if(v===null||v===undefined||v==="")return "";
-    if(typeof v==="number" && window.XLSX?.SSF){
-      try{
-        const d=XLSX.SSF.parse_date_code(v);
-        if(d?.y&&d?.m&&d?.d)return String(d.y).padStart(4,"0")+"-"+String(d.m).padStart(2,"0")+"-"+String(d.d).padStart(2,"0");
-      }catch{}
-    }
+    if(typeof v==="number"&&window.XLSX?.SSF){try{const d=XLSX.SSF.parse_date_code(v);if(d?.y&&d?.m&&d?.d)return String(d.y).padStart(4,"0")+"-"+String(d.m).padStart(2,"0")+"-"+String(d.d).padStart(2,"0");}catch{}}
     const s=String(v).trim();
     if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);
     if(/^\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}$/.test(s))return isoFromDateInput(s);
     if(/^\d{6,8}$/.test(s))return isoFromDateInput(s);
-    const d=new Date(s);
-    if(!Number.isNaN(d.getTime()))return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+    const d=new Date(s);if(!Number.isNaN(d.getTime()))return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
     return "";
   };
-  const escLocal=s=>String(s??"").replace(/[&<>\"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'\"':"&quot;"}[m]));
-
   function ensureStyle(){
     if(document.getElementById("inicio-toolbar-style"))return;
-    const style=document.createElement("style");
-    style.id="inicio-toolbar-style";
+    const style=document.createElement("style");style.id="inicio-toolbar-style";
     style.textContent=`
       .inicio-card>.toolbar.inicio-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin-bottom:12px;position:relative;z-index:80;}
       .inicio-toolbar button{white-space:nowrap;}
@@ -50,173 +37,58 @@
       .inicio-modal-actions .primary{background:#126fae;color:#fff;border-color:#126fae;}
       .inicio-modal-actions .secondary{background:#fff;color:#285a7d;}
       @media(max-width:760px){.inicio-card>.toolbar.inicio-toolbar{gap:6px;overflow-x:auto;padding-bottom:3px}.inicio-nuevo-grid{grid-template-columns:1fr}.inicio-nuevo-grid .full{grid-column:auto;}}
-    `;
-    document.head.appendChild(style);
+    `;document.head.appendChild(style);
   }
-
   function currentRows(){
     const q=$("search")?.value?.trim()||"";
-    const searched=typeof window.inicioSearch==="function"?window.inicioSearch(cache.inicio||[],q):(cache.inicio||[]);
-    return typeof window.inicioApply==="function"?window.inicioApply(searched):searched;
+    return cache.inicio||[];
   }
-
   function toolbarHtml(rows){
-    return '<div class="toolbar inicio-toolbar">'
-      +'<button type="button" onclick="inicioNuevo()">+ NUEVO</button>'
-      +'<button type="button" class="alt" onclick="importInicioXlsx()">IMPORTAR XLSX</button>'
-      +'<button type="button" class="alt" onclick="exportInicioXlsx()">EXPORTAR XLSX</button>'
-      +'<button type="button" class="alt clear-filters-btn" onclick="clearInicioFilters()">LIMPIAR FILTROS</button>'
-      +'<span class="muted">'+rows.length+' REGISTROS</span>'
-      +'</div>';
+    return '<div class="toolbar inicio-toolbar"><button type="button" onclick="inicioNuevo()">+ NUEVO</button><button type="button" class="alt" onclick="importInicioXlsx()">IMPORTAR XLSX</button><button type="button" class="alt" onclick="exportInicioXlsx()">EXPORTAR XLSX</button><button type="button" class="alt clear-filters-btn" onclick="clearInicioFilters()">LIMPIAR FILTROS</button><span class="muted">'+rows.length+' REGISTROS</span></div>';
   }
-
   function patchInicioToolbar(){
-    const title=$("title"),content=$("content");
-    if(!title||!content||norm(title.textContent)!=="INICIO")return;
-    const card=content.querySelector(".inicio-card");
-    if(!card)return;
-    const table=card.querySelector(".inicio-table");
-    if(!table)return;
-    ensureStyle();
-    const old=card.querySelector(".inicio-toolbar");
-    const rows=currentRows();
-    if(!old){
-      const first=card.querySelector(".toolbar");
-      if(first)first.outerHTML=toolbarHtml(rows);
-      else card.insertAdjacentHTML("afterbegin",toolbarHtml(rows));
-    }else{
-      const count=old.querySelector(".muted");
-      if(count)count.textContent=rows.length+" REGISTROS";
-    }
+    const title=$("title"),content=$("content");if(!title||!content||norm(title.textContent)!=="INICIO")return;
+    const card=content.querySelector(".inicio-card");if(!card)return;
+    const table=card.querySelector(".inicio-table");if(!table)return;
+    ensureStyle();const old=card.querySelector(".inicio-toolbar");const rows=currentRows();
+    if(!old){const first=card.querySelector(".toolbar");if(first)first.outerHTML=toolbarHtml(rows);else card.insertAdjacentHTML("afterbegin",toolbarHtml(rows));}
+    else{const count=old.querySelector(".muted"),text=rows.length+" REGISTROS";if(count&&count.textContent!==text)count.textContent=text;}
     const wrap=card.querySelector(".tablewrap");
-    if(wrap){
-      wrap.classList.add("inicio-scroll-wrap");
-      wrap.style.overflowX="auto";
-      wrap.style.overflowY="auto";
-      wrap.style.height="calc(450px - 78px)";
-      wrap.style.maxHeight="none";
-      table.style.minWidth="1215px";
-      table.style.width="max-content";
-    }
+    if(wrap){wrap.classList.add("inicio-scroll-wrap");wrap.style.overflowX="auto";wrap.style.overflowY="auto";wrap.style.height="calc(450px - 78px)";wrap.style.maxHeight="none";table.style.minWidth="1215px";table.style.width="max-content";}
   }
-
   function makeNuevoModal(){
-    let modal=document.getElementById("inicio-nuevo-modal");
-    if(modal)return modal;
-    modal=document.createElement("div");
-    modal.id="inicio-nuevo-modal";
-    modal.className="modal hidden";
-    modal.innerHTML='<div class="modalbox"><button type="button" class="x" data-close-inicio>×</button><h3>NUEVO REGISTRO — INICIO</h3><form id="inicio-nuevo-form"><div class="inicio-nuevo-grid">'
-      +'<label>NIT<input name="nit" required></label>'
-      +'<label>EXPEDIENTE<input name="expediente" required></label>'
-      +'<label>RAZÓN SOCIAL<input name="razon_social" required></label>'
-      +'<label>FECHA PRESCRIPCIÓN<input name="fecha_prescripcion" inputmode="numeric" maxlength="10" placeholder="DD/MM/AA"></label>'
-      +'<label>ESTADO<select name="estado">'+ESTADOS.map(x=>'<option value="'+x+'" '+(x==="PENDIENTE"?'selected':'')+'>'+x+'</option>').join('')+'</select></label>'
-      +'<label class="full">OBSERVACIONES<textarea name="observaciones"></textarea></label>'
-      +'</div><div class="inicio-modal-actions"><button type="button" class="secondary" data-close-inicio>CANCELAR</button><button type="submit" class="primary">GUARDAR</button></div></form></div>';
-    document.body.appendChild(modal);
-    modal.querySelectorAll("[data-close-inicio]").forEach(b=>b.addEventListener("click",()=>modal.classList.add("hidden")));
-    modal.addEventListener("click",e=>{if(e.target===modal)modal.classList.add("hidden");});
-    const date=modal.querySelector("[name=fecha_prescripcion]");
-    date?.addEventListener("input",()=>{date.value=formatDateTyping(date.value);});
+    let modal=document.getElementById("inicio-nuevo-modal");if(modal)return modal;
+    modal=document.createElement("div");modal.id="inicio-nuevo-modal";modal.className="modal hidden";
+    modal.innerHTML='<div class="modalbox"><button type="button" class="x" data-close-inicio>×</button><h3>NUEVO REGISTRO — INICIO</h3><form id="inicio-nuevo-form"><div class="inicio-nuevo-grid"><label>NIT<input name="nit" required></label><label>EXPEDIENTE<input name="expediente" required></label><label>RAZÓN SOCIAL<input name="razon_social" required></label><label>FECHA PRESCRIPCIÓN<input name="fecha_prescripcion" inputmode="numeric" maxlength="10" placeholder="DD/MM/AA"></label><label>ESTADO<select name="estado">'+ESTADOS.map(x=>'<option value="'+x+'" '+(x==="PENDIENTE"?'selected':'')+'>'+x+'</option>').join('')+'</select></label><label class="full">OBSERVACIONES<textarea name="observaciones"></textarea></label></div><div class="inicio-modal-actions"><button type="button" class="secondary" data-close-inicio>CANCELAR</button><button type="submit" class="primary">GUARDAR</button></div></form></div>';
+    document.body.appendChild(modal);modal.querySelectorAll("[data-close-inicio]").forEach(b=>b.addEventListener("click",()=>modal.classList.add("hidden")));modal.addEventListener("click",e=>{if(e.target===modal)modal.classList.add("hidden")});
+    const date=modal.querySelector("[name=fecha_prescripcion]");date?.addEventListener("input",()=>{date.value=formatDateTyping(date.value)});
     modal.querySelector("form")?.addEventListener("submit",async e=>{
-      e.preventDefault();
-      const form=e.currentTarget;
-      const data=new FormData(form);
-      const payload={
-        nit:norm(data.get("nit")),
-        expediente:norm(data.get("expediente")),
-        razon_social:norm(data.get("razon_social")),
-        fecha_prescripcion:isoFromDateInput(data.get("fecha_prescripcion")||"")||null,
-        estado:norm(data.get("estado"))||"PENDIENTE",
-        observaciones:norm(data.get("observaciones"))||null
-      };
+      e.preventDefault();const form=e.currentTarget,data=new FormData(form);
+      const payload={nit:norm(data.get("nit")),expediente:norm(data.get("expediente")),razon_social:norm(data.get("razon_social")),fecha_prescripcion:isoFromDateInput(data.get("fecha_prescripcion")||"")||null,estado:norm(data.get("estado"))||"PENDIENTE",observaciones:norm(data.get("observaciones"))||null};
       if(!payload.nit||!payload.expediente||!payload.razon_social){alert("NIT, EXPEDIENTE Y RAZÓN SOCIAL SON OBLIGATORIOS.");return;}
-      const button=form.querySelector("button[type=submit]");
-      if(button)button.disabled=true;
-      try{
-        const r=await db.from("cartera_inicio").insert(payload).select("id,nit,expediente,razon_social,fecha_prescripcion,estado,observaciones").single();
-        if(r.error)throw r.error;
-        cache.inicio.push(r.data);
-        modal.classList.add("hidden");
-        form.reset();
-        form.querySelector("[name=estado]").value="PENDIENTE";
-        if(typeof window.renderInicio==="function")window.renderInicio();
-        else if(typeof window.refreshInicio==="function")await window.refreshInicio();
-      }catch(err){
-        console.error("ERROR NUEVO INICIO",err);
-        alert("NO FUE POSIBLE CREAR EL REGISTRO: "+(err.message||err));
-      }finally{if(button)button.disabled=false;}
-    });
-    return modal;
+      const button=form.querySelector("button[type=submit]");if(button)button.disabled=true;
+      try{const r=await db.from("cartera_inicio").insert(payload).select("id,nit,expediente,razon_social,fecha_prescripcion,estado,observaciones").single();if(r.error)throw r.error;cache.inicio.push(r.data);modal.classList.add("hidden");form.reset();form.querySelector("[name=estado]").value="PENDIENTE";if(typeof window.refreshInicio==="function")await window.refreshInicio();}
+      catch(err){console.error("ERROR NUEVO INICIO",err);alert("NO FUE POSIBLE CREAR EL REGISTRO: "+(err.message||err));}
+      finally{if(button)button.disabled=false;}
+    });return modal;
   }
-
-  window.inicioNuevo=function(){
-    ensureStyle();
-    const modal=makeNuevoModal();
-    modal.classList.remove("hidden");
-    modal.querySelector("[name=nit]")?.focus();
-  };
-
+  window.inicioNuevo=function(){ensureStyle();const modal=makeNuevoModal();modal.classList.remove("hidden");modal.querySelector("[name=nit]")?.focus();};
   window.exportInicioXlsx=function(){
-    try{
-      if(!window.XLSX)throw Error("NO SE ENCUENTRA EL MÓDULO XLSX.");
-      const rows=currentRows();
-      const data=rows.map(r=>({NIT:r.nit||"",EXPEDIENTE:r.expediente||"",["RAZÓN SOCIAL"]:r.razon_social||"",["FECHA PRESCRIPCIÓN"]:r.fecha_prescripcion||"",ESTADO:r.estado||"",OBSERVACIONES:r.observaciones||""}));
-      const ws=XLSX.utils.json_to_sheet(data);
-      const wb=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb,ws,"Inicio");
-      XLSX.writeFile(wb,"Inventario_Cartera_Inicio.xlsx");
-    }catch(err){alert("NO FUE POSIBLE EXPORTAR INICIO: "+(err.message||err));}
+    try{if(!window.XLSX)throw Error("NO SE ENCUENTRA EL MÓDULO XLSX.");const rows=currentRows();const data=rows.map(r=>({NIT:r.nit||"",EXPEDIENTE:r.expediente||"",["RAZÓN SOCIAL"]:r.razon_social||"",["FECHA PRESCRIPCIÓN"]:r.fecha_prescripcion||"",ESTADO:r.estado||"",OBSERVACIONES:r.observaciones||""}));const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Inicio");XLSX.writeFile(wb,"Inventario_Cartera_Inicio.xlsx");}
+    catch(err){alert("NO FUE POSIBLE EXPORTAR INICIO: "+(err.message||err));}
   };
-
   window.importInicioXlsx=function(){
     if(!window.XLSX){alert("NO SE ENCUENTRA EL MÓDULO XLSX.");return;}
-    const input=document.createElement("input");
-    input.type="file";input.accept=".xlsx,.xls";input.style.display="none";
-    document.body.appendChild(input);
+    const input=document.createElement("input");input.type="file";input.accept=".xlsx,.xls";input.style.display="none";document.body.appendChild(input);
     input.addEventListener("change",async()=>{
-      const file=input.files?.[0];
-      if(!file){input.remove();return;}
-      try{
-        const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:false});
-        const ws=wb.Sheets[wb.SheetNames[0]];
-        const raw=XLSX.utils.sheet_to_json(ws,{defval:""});
-        if(!raw.length)throw Error("EL ARCHIVO NO CONTIENE REGISTROS.");
-        const mapHeader=h=>norm(h).normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-        const find=(row,names)=>{const key=Object.keys(row).find(k=>names.includes(mapHeader(k)));return key?row[key]:"";};
-        const payload=raw.map(row=>({
-          nit:norm(find(row,["NIT","IDENTIFICACION","IDENTIFICACION CONTRIBUYENTE"])),
-          expediente:norm(find(row,["EXPEDIENTE","NUMERO EXPEDIENTE","N EXPEDIENTE"])),
-          razon_social:norm(find(row,["RAZON SOCIAL","RAZON SOCIAL CONTRIBUYENTE","CONTRIBUYENTE"])),
-          fecha_prescripcion:iso(find(row,["FECHA PRESCRIPCION","FECHA DE PRESCRIPCION","FECHA PRESCRIPCIÓN"])),
-          estado:norm(find(row,["ESTADO","GESTION","GESTIÓN"]))||"PENDIENTE",
-          observaciones:norm(find(row,["OBSERVACIONES","OBSERVACION","COMENTARIOS","COMENTARIO"]))||null
-        })).filter(r=>r.nit||r.expediente||r.razon_social);
-        if(!payload.length)throw Error("NO SE ENCONTRARON COLUMNAS DE INICIO RECONOCIBLES.");
-        const valid=payload.filter(r=>r.expediente||r.nit||r.razon_social);
-        const r=await db.from("cartera_inicio").insert(valid);
-        if(r.error)throw r.error;
-        await loadInicio();
-        renderInicio();
-        alert("IMPORTACIÓN COMPLETADA: "+valid.length+" REGISTROS.");
-      }catch(err){
-        console.error("ERROR IMPORTANDO INICIO",err);
-        alert("NO FUE POSIBLE IMPORTAR EL ARCHIVO: "+(err.message||err));
-      }finally{input.remove();}
-    },{once:true});
-    input.click();
+      const file=input.files?.[0];if(!file){input.remove();return;}
+      try{const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:false}),ws=wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(ws,{defval:""});if(!raw.length)throw Error("EL ARCHIVO NO CONTIENE REGISTROS.");
+        const mapHeader=h=>norm(h).normalize("NFD").replace(/[\u0300-\u036f]/g,"");const find=(row,names)=>{const key=Object.keys(row).find(k=>names.includes(mapHeader(k)));return key?row[key]:""};
+        const payload=raw.map(row=>({nit:norm(find(row,["NIT","IDENTIFICACION","IDENTIFICACION CONTRIBUYENTE"])),expediente:norm(find(row,["EXPEDIENTE","NUMERO EXPEDIENTE","N EXPEDIENTE"])),razon_social:norm(find(row,["RAZON SOCIAL","RAZON SOCIAL CONTRIBUYENTE","CONTRIBUYENTE"])),fecha_prescripcion:iso(find(row,["FECHA PRESCRIPCION","FECHA DE PRESCRIPCION","FECHA PRESCRIPCIÓN"])),estado:norm(find(row,["ESTADO","GESTION","GESTIÓN"]))||"PENDIENTE",observaciones:norm(find(row,["OBSERVACIONES","OBSERVACION","COMENTARIOS","COMENTARIO"]))||null})).filter(r=>r.nit||r.expediente||r.razon_social);
+        if(!payload.length)throw Error("NO SE ENCONTRARON COLUMNAS DE INICIO RECONOCIBLES.");const r=await db.from("cartera_inicio").insert(payload);if(r.error)throw r.error;await window.refreshInicio();alert("IMPORTACIÓN COMPLETADA: "+payload.length+" REGISTROS.");
+      }catch(err){console.error("ERROR IMPORTANDO INICIO",err);alert("NO FUE POSIBLE IMPORTAR EL ARCHIVO: "+(err.message||err));}finally{input.remove();}
+    },{once:true});input.click();
   };
-
-  function start(){
-    ensureStyle();
-    const content=$("content");
-    if(!content)return;
-    const observer=new MutationObserver(()=>patchInicioToolbar());
-    observer.observe(content,{childList:true,subtree:true});
-    patchInicioToolbar();
-    setTimeout(patchInicioToolbar,150);
-    setTimeout(patchInicioToolbar,700);
-  }
+  function start(){ensureStyle();const content=$("content");if(!content)return;const observer=new MutationObserver(()=>patchInicioToolbar());observer.observe(content,{childList:true,subtree:true});patchInicioToolbar();setTimeout(patchInicioToolbar,150);setTimeout(patchInicioToolbar,700);}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
 })();
