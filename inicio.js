@@ -1,7 +1,9 @@
-/* INVENTARIO DE CARTERA — VISTA INICIO — VERSION 20261009.2 */
+/* INVENTARIO DE CARTERA — VISTA INICIO — VERSION 20261009.3 */
 (function(){
-  const INICIO_VERSION="20261009.2";
-  const inicioDb=window.supabase.createClient(window.__INVENTARIO_SUPABASE__.url,window.__INVENTARIO_SUPABASE__.key,{auth:{autoRefreshToken:true,persistSession:false,detectSessionInUrl:false,flowType:"implicit"}});
+  const INICIO_VERSION="20261009.3";
+  /* IMPORTANTE: reutilizar el cliente autenticado de app.js. Crear un segundo cliente
+     con persistSession:false elimina la sesión para RLS y devuelve 0 registros. */
+  const inicioDb=db;
   window.__inicioRows=[];
   tableState.inicio={sortKey:null,asc:null,filters:{}};
   cache.inicio=[];
@@ -61,9 +63,10 @@
   async function updateInicio(id,patch){
     const row=cache.inicio.find(x=>Number(x.id)===Number(id));
     if(!row)return;
+    const previous={...row};
     Object.assign(row,patch);
     const r=await inicioDb.from("cartera_inicio").update(patch).eq("id",id);
-    if(r.error){console.error("ERROR ACTUALIZANDO INICIO",r.error);alert("NO FUE POSIBLE GUARDAR EL CAMBIO: "+r.error.message);await loadInicio();renderInicio();return;}
+    if(r.error){console.error("ERROR ACTUALIZANDO INICIO",r.error);Object.assign(row,previous);alert("NO FUE POSIBLE GUARDAR EL CAMBIO: "+r.error.message);renderInicio();}
   }
   window.updateInicio=updateInicio;
   window.home=async function(){
