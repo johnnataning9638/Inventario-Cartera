@@ -41,6 +41,9 @@
       .expedientes-table thead th .header-tools{min-width:40px!important;width:40px!important;max-width:40px!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:4px!important;box-sizing:border-box!important;}
       .expedientes-table thead th .filter-icon,.expedientes-table thead th .sort-header{flex-shrink:0!important;}
       .expedientes-table thead th .column-filter-panel{box-sizing:border-box!important;max-width:min(360px,calc(100vw - 24px))!important;}
+      .expedientes-table th[data-column-key="estado"],.expedientes-table td:nth-child(12){width:220px!important;min-width:220px!important;max-width:220px!important;}
+      .expedientes-table th[data-column-key="estado"] .header-tools{width:220px!important;max-width:220px!important;}
+      .expedientes-table th[data-column-key="estado"] .column-filter-panel{max-width:220px!important;}
     `;document.head.appendChild(style);
   }
   const TARGET_URL="https://wwkcgspbarhbhcbayerw.supabase.co";
