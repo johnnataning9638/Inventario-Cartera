@@ -6,19 +6,27 @@
    obsolete cartera_acceso INSERT path. The real session is returned from the second call,
    which is used by the controlled MFA flow. This does not alter database/RLS permissions. */
 (function(){
-  /* PERFORMANCE GUARD: must install before app.js/fix.js so Expedientes never runs the
-     expensive 1.8s auto-fit loop or recalculates 761 rows during sort/filter mutations. */
+  /* PERFORMANCE GUARD: Expedientes has a large data set. Never run the legacy global
+     auto-fit over that table during sort/filter/render cycles. Inicio uses fixed logical
+     widths and remains untouched. */
   if(!window.__CARTERA_PERF_GUARD__){
     window.__CARTERA_PERF_GUARD__=true;
     const NativeSetInterval=window.setInterval.bind(window);
     window.setInterval=function(fn,delay,...args){
-      try{const src=Function.prototype.toString.call(fn);if(/autoFitTables\(document\)/.test(src)||/scan\(document\)/.test(src))return NativeSetInterval(()=>{},60000,...args);}catch{}
+      try{
+        const src=Function.prototype.toString.call(fn);
+        if(/autoFitTables\(document\)/.test(src)||/scan\(document\)/.test(src))return NativeSetInterval(()=>{},60000,...args);
+      }catch{}
       return NativeSetInterval(fn,delay,...args);
     };
-    let wrappedAutoFit=null,lastAutoFit=0;
+    let wrappedAutoFit=null;
     Object.defineProperty(window,'autoFitCarteraTables',{configurable:true,get(){return wrappedAutoFit;},set(fn){
       if(typeof fn!=='function'){wrappedAutoFit=fn;return;}
-      wrappedAutoFit=function(root,force){const now=Date.now();if(!force&&now-lastAutoFit<1200)return;lastAutoFit=now;return fn(root,force);};
+      wrappedAutoFit=function(root,force){
+        try{if((root||document).querySelector?.('table.expedientes-table'))return;}
+        catch{}
+        return fn(root,force);
+      };
     }});
     const NativeMutationObserver=window.MutationObserver;
     if(NativeMutationObserver){
@@ -32,19 +40,17 @@
       };
       window.MutationObserver.prototype=NativeMutationObserver.prototype;
     }
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installCarteraPerfStyle);else installCarteraPerfStyle();
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadExpedientesFastUI);else loadExpedientesFastUI();
   }
-  function installCarteraPerfStyle(){
-    if(document.getElementById('cartera-performance-guard-style'))return;
-    const style=document.createElement('style');style.id='cartera-performance-guard-style';style.textContent=`
-      .expedientes-table thead th{box-sizing:border-box!important;padding-left:7px!important;padding-right:42px!important;white-space:nowrap!important;overflow:visible!important;}
-      .expedientes-table thead th .header-tools{min-width:40px!important;width:40px!important;max-width:40px!important;display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:4px!important;box-sizing:border-box!important;}
-      .expedientes-table thead th .filter-icon,.expedientes-table thead th .sort-header{flex-shrink:0!important;}
-      .expedientes-table thead th .column-filter-panel{box-sizing:border-box!important;max-width:min(360px,calc(100vw - 24px))!important;}
-      .expedientes-table th[data-column-key="estado"],.expedientes-table td:nth-child(12){width:220px!important;min-width:220px!important;max-width:220px!important;}
-      .expedientes-table th[data-column-key="estado"] .header-tools{width:220px!important;max-width:220px!important;}
-      .expedientes-table th[data-column-key="estado"] .column-filter-panel{max-width:220px!important;}
-    `;document.head.appendChild(style);
+  function loadExpedientesFastUI(){
+    if(window.__EXPEDIENTES_FAST_LOADER__)return;
+    window.__EXPEDIENTES_FAST_LOADER__=true;
+    const s=document.createElement('script');
+    s.src='expedientes-fast.js?v=20261009.1';
+    s.async=false;
+    s.onload=()=>console.info('[INVENTARIO] CAPA EXPEDIENTES FAST UI CARGADA.');
+    s.onerror=e=>console.warn('[INVENTARIO] NO SE PUDO CARGAR LA CAPA EXPEDIENTES FAST UI',e);
+    document.head.appendChild(s);
   }
   const TARGET_URL="https://wwkcgspbarhbhcbayerw.supabase.co";
   const TARGET_KEY="sb_publishable_UCLa1Eax6ZxwcTGEwVqE_w_cP-XjM_8";
