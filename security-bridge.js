@@ -26,12 +26,7 @@
       client.from=function(table){
         const name=String(table||'');
         if(removedTables.has(name)){
-          return {
-            select:()=>({
-              order:async()=>({data:[],error:null}),
-              then:(resolve,reject)=>Promise.resolve({data:[],error:null}).then(resolve,reject)
-            })
-          };
+          return {select:()=>({order:async()=>({data:[],error:null}),then:(resolve,reject)=>Promise.resolve({data:[],error:null}).then(resolve,reject)})};
         }
         return originalFrom(table);
       };
@@ -47,14 +42,15 @@
     if(a)a.textContent='ACTUACIONES / EXPEDIENTES';
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',normalizeNavigation);else normalizeNavigation();
-  const loadTitulosLayer=()=>{
-    if(window.__TITULOS_LAYER_LOADED__)return;
-    window.__TITULOS_LAYER_LOADED__=true;
-    const s=document.createElement('script');
-    s.src='titulos.js?v=20261010.1';s.async=false;
-    s.onload=()=>console.info('[INVENTARIO] CAPA TÍTULOS / TDJ CARGADA.');
-    s.onerror=e=>console.warn('[INVENTARIO] NO SE PUDO CARGAR LA CAPA TÍTULOS / TDJ',e);
+  const loadLayer=(key,src,label)=>{
+    if(window[key])return;
+    window[key]=true;
+    const s=document.createElement('script');s.src=src;s.async=false;
+    s.onload=()=>console.info('[INVENTARIO] '+label+' CARGADA.');
+    s.onerror=e=>console.warn('[INVENTARIO] NO SE PUDO CARGAR '+label,e);
     document.head.appendChild(s);
   };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadTitulosLayer);else loadTitulosLayer();
+  const loadTitulosLayer=()=>loadLayer('__TITULOS_LAYER_LOADED__','titulos.js?v=20261010.1','CAPA TÍTULOS / TDJ');
+  const loadActuacionesLayer=()=>loadLayer('__ACTUACIONES_EXPEDIENTES_LAYER_LOADED__','actuaciones-expedientes.js?v=20261010.1','CAPA ACTUACIONES / EXPEDIENTES');
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{loadTitulosLayer();loadActuacionesLayer();});else{loadTitulosLayer();loadActuacionesLayer();}
 })();
