@@ -25,9 +25,7 @@
       const removedTables=new Set(['cartera_expedientes','cartera_embargos']);
       client.from=function(table){
         const name=String(table||'');
-        if(removedTables.has(name)){
-          return {select:()=>({order:async()=>({data:[],error:null}),then:(resolve,reject)=>Promise.resolve({data:[],error:null}).then(resolve,reject)})};
-        }
+        if(removedTables.has(name))return {select:()=>({order:async()=>({data:[],error:null}),then:(resolve,reject)=>Promise.resolve({data:[],error:null}).then(resolve,reject)})};
         return originalFrom(table);
       };
     }catch(error){console.warn('[INVENTARIO] GUARD DE AUTENTICACIÓN',error);}
@@ -42,15 +40,8 @@
     if(a)a.textContent='ACTUACIONES / EXPEDIENTES';
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',normalizeNavigation);else normalizeNavigation();
-  const loadLayer=(key,src,label)=>{
-    if(window[key])return;
-    window[key]=true;
-    const s=document.createElement('script');s.src=src;s.async=false;
-    s.onload=()=>console.info('[INVENTARIO] '+label+' CARGADA.');
-    s.onerror=e=>console.warn('[INVENTARIO] NO SE PUDO CARGAR '+label,e);
-    document.head.appendChild(s);
-  };
+  const loadLayer=(key,src,label)=>{if(window[key])return;window[key]=true;const s=document.createElement('script');s.src=src;s.async=false;s.onload=()=>console.info('[INVENTARIO] '+label+' CARGADA.');s.onerror=e=>console.warn('[INVENTARIO] NO SE PUDO CARGAR '+label,e);document.head.appendChild(s);};
   const loadTitulosLayer=()=>loadLayer('__TITULOS_LAYER_LOADED__','titulos.js?v=20261010.1','CAPA TÍTULOS / TDJ');
-  const loadActuacionesLayer=()=>loadLayer('__ACTUACIONES_EXPEDIENTES_LAYER_LOADED__','actuaciones-expedientes.js?v=20261010.2','CAPA ACTUACIONES / EXPEDIENTES');
+  const loadActuacionesLayer=()=>loadLayer('__ACTUACIONES_EXPEDIENTES_LAYER_LOADED__','actuaciones-expedientes.js?v=20261010.3','CAPA ACTUACIONES / EXPEDIENTES');
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{loadTitulosLayer();loadActuacionesLayer();});else{loadTitulosLayer();loadActuacionesLayer();}
 })();
