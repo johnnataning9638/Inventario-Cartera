@@ -10,10 +10,7 @@
       #content .titulos-edit:hover,#content .titulos-edit:focus{border-color:#8aa9bf;background:#fff;box-shadow:0 1px 3px #00000012}
       #content .titulos-money{text-align:right;text-transform:none}.titulos-date{min-width:105px}.titulos-select{min-width:125px;cursor:pointer}.titulos-observacion{min-width:240px}
       #content table.resizable-table.titulos-auto-fit{table-layout:auto}
-      #content table.resizable-table.titulos-auto-fit th.titulos-fit-col,#content table.resizable-table.titulos-auto-fit td.titulos-fit-col{white-space:nowrap;width:max-content}
-      #content table.resizable-table.titulos-auto-fit td.titulos-fit-col .titulos-edit{width:max-content;min-width:100%}
-      #content table.resizable-table.titulos-auto-fit th.titulos-fit-observacion,#content table.resizable-table.titulos-auto-fit td.titulos-fit-observacion{white-space:normal;width:max-content}
-      #content table.resizable-table.titulos-auto-fit td.titulos-fit-observacion .titulos-edit{width:max-content;min-width:240px;max-width:520px;white-space:normal}
+      #content table.resizable-table.titulos-auto-fit td.titulos-fit-observacion .titulos-edit{max-width:900px;white-space:normal}
       #content td{vertical-align:middle}
     `;document.head.appendChild(st);
   }
@@ -55,15 +52,13 @@
   function applyTitulosAutoFit(){
     const table=$("content")?.querySelector("table.resizable-table");if(!table)return;
     table.classList.add("titulos-auto-fit");
-    const headers=Array.from(table.querySelectorAll("thead th"));
     const fitKeys=new Set(["tdj","estado","tipo_radicacion","observaciones"]);
-    headers.forEach((th,index)=>{
-      const key=String(th.dataset?.key||th.getAttribute("data-key")||"").trim().toLowerCase();
+    const headers=Array.from(table.querySelectorAll("thead th[data-column-key]"));
+    headers.forEach(th=>{
+      const key=String(th.dataset.columnKey||"").trim().toLowerCase();
       if(!fitKeys.has(key))return;
       th.classList.add(key==="observaciones"?"titulos-fit-observacion":"titulos-fit-col");
-      table.querySelectorAll("tbody tr").forEach(tr=>{
-        const td=tr.children[index];if(td)td.classList.add(key==="observaciones"?"titulos-fit-observacion":"titulos-fit-col");
-      });
+      autoFitColumn(table,th,"titulos",key);
     });
   }
   function listTitulos(){
