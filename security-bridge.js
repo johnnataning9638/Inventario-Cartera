@@ -22,9 +22,17 @@
         return originalGetSession(...args);
       };
       const originalFrom=client.from.bind(client);
-      const legacyTable=['cartera','expedientes'].join('_');
+      const removedTables=new Set(['cartera_expedientes','cartera_embargos']);
       client.from=function(table){
-        if(String(table||'')===legacyTable)return originalFrom('cartera_inicio');
+        const name=String(table||'');
+        if(removedTables.has(name)){
+          return {
+            select:()=>({
+              order:async()=>({data:[],error:null}),
+              then:(resolve,reject)=>Promise.resolve({data:[],error:null}).then(resolve,reject)
+            })
+          };
+        }
         return originalFrom(table);
       };
     }catch(error){console.warn('[INVENTARIO] GUARD DE AUTENTICACIÓN',error);}
@@ -32,6 +40,7 @@
   };
   window.__INVENTARIO_SUPABASE_ISOLATED__=true;
   window.__INVENTARIO_LEGACY_AUTH_GUARD__=true;
+  window.__INVENTARIO_REMOVED_TABLE_GUARD__=true;
   function normalizeNavigation(){
     document.querySelectorAll('nav button[data-view="expedientes"]').forEach(b=>b.remove());
     const a=document.querySelector('nav button[data-view="actuaciones"]');
