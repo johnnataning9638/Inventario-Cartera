@@ -5,12 +5,12 @@
     const NativeSetInterval=window.setInterval.bind(window);
     window.setInterval=function(fn,delay,...args){try{const src=Function.prototype.toString.call(fn);if(/autoFitTables\(document\)/.test(src)||/scan\(document\)/.test(src))return NativeSetInterval(()=>{},60000,...args)}catch{}return NativeSetInterval(fn,delay,...args);};
   }
-  const TARGET_URL="https://wwkcgspbarhbhcbayerw.supabase.co";
-  const TARGET_KEY="sb_publishable_UCLa1Eax6ZxwcTGEwVqE_w_cP-XjM_8";
+  const TARGET_URL=window.__INVENTARIO_SUPABASE__?.url||"https://wwkcgspbarhbhcbayerw.supabase.co";
   if(!window.supabase||typeof window.supabase.createClient!=="function")return;
   const originalCreateClient=window.supabase.createClient.bind(window.supabase);
   window.supabase.createClient=function(_url,_key,options){
-    const client=originalCreateClient(TARGET_URL,TARGET_KEY,options||{});
+    const targetKey=window.__INVENTARIO_SUPABASE__?.key||_key;
+    const client=originalCreateClient(TARGET_URL,targetKey,options||{});
     try{
       let legacyBootSuppressed=false;const originalGetSession=client.auth.getSession.bind(client.auth);
       client.auth.getSession=async function(...args){if(!legacyBootSuppressed){legacyBootSuppressed=true;return {data:{session:null},error:null};}return originalGetSession(...args);};
@@ -24,5 +24,6 @@
   const loadLayer=(key,src,label)=>{if(window[key])return;window[key]=true;const s=document.createElement('script');s.src=src;s.async=false;s.onload=()=>console.info('[INVENTARIO] '+label+' CARGADA.');s.onerror=e=>console.warn('[INVENTARIO] NO SE PUDO CARGAR '+label,e);document.head.appendChild(s);};
   const loadTitulosLayer=()=>loadLayer('__TITULOS_LAYER_LOADED__','titulos.js?v=20261010.1','CAPA TÍTULOS / TDJ');
   const loadActuacionesLayer=()=>loadLayer('__ACTUACIONES_EXPEDIENTES_LAYER_LOADED__','actuaciones-expedientes.js?v=20261010.4','CAPA ACTUACIONES / EXPEDIENTES');
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{loadTitulosLayer();loadActuacionesLayer();});else{loadTitulosLayer();loadActuacionesLayer();}
+  const loadOptimizationLayers=()=>{loadLayer('__ACTUACIONES_OPT_LOADED__','optimizacion-actuaciones.js?v=20261010.5','OPTIMIZACIÓN ACTUACIONES');loadLayer('__CARTERA_DELETE_LAYER_LOADED__','acciones-eliminar.js?v=20261010.5','BOTÓN ELIMINAR');};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{loadTitulosLayer();loadActuacionesLayer();setTimeout(loadOptimizationLayers,20);});else{loadTitulosLayer();loadActuacionesLayer();setTimeout(loadOptimizationLayers,20);}
 })();
