@@ -62,4 +62,17 @@
   };
   window.__INVENTARIO_SUPABASE_ISOLATED__=true;
   window.__INVENTARIO_LEGACY_AUTH_GUARD__=true;
+
+  /* TÍTULOS / TDJ: carga la capa específica después de app.js. */
+  const loadTitulosLayer=()=>{
+    if(window.__TITULOS_LAYER_LOADED__)return;
+    window.__TITULOS_LAYER_LOADED__=true;
+    const s=document.createElement('script');
+    s.src='titulos.js?v=20261010.1';
+    s.async=false;
+    s.onload=()=>console.info('[INVENTARIO] CAPA TÍTULOS / TDJ CARGADA.');
+    s.onerror=e=>console.warn('[INVENTARIO] NO SE PUDO CARGAR LA CAPA TÍTULOS / TDJ',e);
+    document.head.appendChild(s);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadTitulosLayer);else loadTitulosLayer();
 })();
