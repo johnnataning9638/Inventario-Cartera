@@ -51,6 +51,6 @@
     document.head.appendChild(s);
   };
   const loadTitulosLayer=()=>loadLayer('__TITULOS_LAYER_LOADED__','titulos.js?v=20261010.1','CAPA TÍTULOS / TDJ');
-  const loadActuacionesLayer=()=>loadLayer('__ACTUACIONES_EXPEDIENTES_LAYER_LOADED__','actuaciones-expedientes.js?v=20261010.1','CAPA ACTUACIONES / EXPEDIENTES');
+  const loadActuacionesLayer=()=>loadLayer('__ACTUACIONES_EXPEDIENTES_LAYER_LOADED__','actuaciones-expedientes.js?v=20261010.2','CAPA ACTUACIONES / EXPEDIENTES');
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{loadTitulosLayer();loadActuacionesLayer();});else{loadTitulosLayer();loadActuacionesLayer();}
 })();
