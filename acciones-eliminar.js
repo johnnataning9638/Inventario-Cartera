@@ -1,0 +1,92 @@
+/* INVENTARIO DE CARTERA — ELIMINACIÓN DE REGISTRO + SELECCIÓN EFICIENTE */
+(function(){
+  const VERSION='20261010.5';
+  const MAP={inicio:'cartera_inicio',titulos:'cartera_titulos',pagos:'cartera_pagos',actuaciones:'cartera_actuaciones',expedientes:'cartera_inicio'};
+  let selected=null;
+  let lastRender=0;
+  function norm(v){return String(v??'').trim().toUpperCase();}
+  function currentType(){
+    const v=String(window.view||'').toLowerCase();
+    if(MAP[v])return v;
+    const title=norm(document.getElementById('title')?.textContent);
+    if(title==='TÍTULOS / TDJ')return 'titulos';
+    if(title==='PAGOS')return 'pagos';
+    if(title==='ACTUACIONES / EXPEDIENTES'||title==='ACTUACIONES')return 'actuaciones';
+    if(title==='INICIO')return 'inicio';
+    return null;
+  }
+  function visibleRows(type){
+    if(type==='inicio'){
+      const q=String(document.getElementById('search')?.value||'').trim().toLowerCase();
+      let rows=[...(cache.inicio||[])];
+      if(q)rows=rows.filter(r=>['nit','expediente','razon_social','fecha_prescripcion','estado','observaciones'].some(k=>String(r?.[k]??'').toLowerCase().includes(q)));
+      const fs=tableState.inicio?.filters||{};
+      Object.keys(fs).forEach(k=>{const f=fs[k]||{};if(k==='fecha_prescripcion'){if(f.from)rows=rows.filter(r=>String(r.fecha_prescripcion||'').slice(0,10)>=String(f.from).slice(0,10));if(f.to)rows=rows.filter(r=>String(r.fecha_prescripcion||'').slice(0,10)<=String(f.to).slice(0,10));}else if(k==='estado'){if(f.value)rows=rows.filter(r=>norm(r.estado)===norm(f.value));}else if(f.text)rows=rows.filter(r=>String(r?.[k]??'').toLowerCase().includes(String(f.text).toLowerCase()));});
+      const st=tableState.inicio||{};if(st.sortKey){const k=st.sortKey,asc=st.asc!==false;rows.sort((a,b)=>{const av=String(a?.[k]??''),bv=String(b?.[k]??'');const c=av.localeCompare(bv,'es',{numeric:true,sensitivity:'base'});return asc?c:-c;});}
+      return rows;
+    }
+    let rows=Array.isArray(cache[type])?[...cache[type]]:[];
+    try{rows=filterRows(type,rows);rows=sortRows(type,rows);}catch{}
+    return rows;
+  }
+  function rowRecord(type,tr){
+    if(!tr)return null;
+    const idx=[...tr.parentElement.children].indexOf(tr);
+    const rows=visibleRows(type);
+    return rows[idx]||null;
+  }
+  function clearSelection(){document.querySelectorAll('tr.cartera-row-selected').forEach(r=>r.classList.remove('cartera-row-selected'));selected=null;syncDeleteButtons();}
+  function selectRow(tr,type){
+    const rec=rowRecord(type,tr);if(!rec||rec.id==null){clearSelection();return;}
+    document.querySelectorAll('tr.cartera-row-selected').forEach(r=>r.classList.remove('cartera-row-selected'));
+    tr.classList.add('cartera-row-selected');selected={type,id:Number(rec.id),record:rec};syncDeleteButtons();
+  }
+  function ensureStyle(){
+    if(document.getElementById('cartera-delete-layer-style'))return;
+    const st=document.createElement('style');st.id='cartera-delete-layer-style';st.textContent=`
+      .cartera-delete-btn{margin-left:0!important}.cartera-delete-btn:disabled{opacity:.48;cursor:not-allowed}
+      #content tr.cartera-row-selected>td{box-shadow:inset 0 1px 0 #6ea2c7,inset 0 -1px 0 #6ea2c7;background:#eef6fb!important}
+      #content tr.cartera-row-selected>td:first-child{box-shadow:inset 2px 0 0 #3c83ad,inset 0 1px 0 #6ea2c7,inset 0 -1px 0 #6ea2c7}
+    `;document.head.appendChild(st);
+  }
+  function syncDeleteButtons(){
+    const type=currentType(),enabled=!!selected&&selected.type===type;
+    document.querySelectorAll('[data-cartera-delete]').forEach(b=>{b.disabled=!enabled;b.title=enabled?'ELIMINAR EL REGISTRO SELECCIONADO':'SELECCIONE UN REGISTRO PARA ELIMINAR';});
+  }
+  function injectDeleteButton(){
+    const type=currentType();if(!type||!MAP[type])return;
+    const toolbar=document.querySelector('#content .toolbar');if(!toolbar)return;
+    if(!toolbar.querySelector('[data-cartera-delete]')){
+      const b=document.createElement('button');b.type='button';b.className='alt cartera-delete-btn';b.dataset.carteraDelete='1';b.textContent='ELIMINAR';b.disabled=true;b.addEventListener('click',deleteSelected);toolbar.appendChild(b);
+    }
+    syncDeleteButtons();
+  }
+  async function deleteSelected(){
+    const type=currentType();if(!selected||selected.type!==type)return alert('SELECCIONE UN REGISTRO PARA ELIMINAR.');
+    const table=MAP[type],id=Number(selected.id);if(!Number.isFinite(id))return;
+    const label=selected.record?.expediente||selected.record?.tdj||selected.record?.recibo||selected.record?.nit||('ID '+id);
+    const ok=window.confirm('¿ESTÁ SEGURO DE QUE DESEA ELIMINAR EL REGISTRO SELECCIONADO?\n\nREGISTRO: '+label+'\n\nESTA ACCIÓN NO SE PUEDE DESHACER.');if(!ok)return;
+    const btn=document.querySelector('[data-cartera-delete]');if(btn){btn.disabled=true;btn.textContent='ELIMINANDO...';}
+    try{
+      let q=db.from(table).delete().eq('id',id);if(currentUser?.id)q=q.eq('user_id',currentUser.id);
+      const {data,error}=await q.select('id').maybeSingle();if(error)throw error;
+      if(!data)throw new Error('EL REGISTRO NO FUE ELIMINADO. VERIFIQUE SU AUTORIZACIÓN.');
+      if(Array.isArray(cache[type])){const i=cache[type].findIndex(r=>Number(r.id)===id);if(i>=0)cache[type].splice(i,1);}
+      selected=null;
+      if(type==='inicio'&&typeof window.refreshInicio==='function')await window.refreshInicio();else if(typeof window.render==='function')window.render();
+      setTimeout(injectDeleteButton,0);alert('REGISTRO ELIMINADO CORRECTAMENTE.');
+    }catch(e){alert('NO SE PUDO ELIMINAR EL REGISTRO: '+(e.message||e));}
+    finally{const b=document.querySelector('[data-cartera-delete]');if(b){b.textContent='ELIMINAR';syncDeleteButtons();}}
+  }
+  function bindSelection(){
+    const content=document.getElementById('content');if(!content||content.dataset.deleteSelectionBound==='1')return;
+    content.dataset.deleteSelectionBound='1';content.addEventListener('click',e=>{const tr=e.target.closest('tbody tr');if(!tr||tr.querySelector('.empty'))return;const type=currentType();if(!type||!MAP[type])return;selectRow(tr,type);},true);
+  }
+  function afterRender(){ensureStyle();bindSelection();injectDeleteButton();lastRender=Date.now();}
+  function wrap(name){
+    const fn=window[name];if(typeof fn!=='function'||fn.__deleteWrapped)return;
+    const wrapped=function(...args){const result=fn.apply(this,args);Promise.resolve(result).finally(()=>setTimeout(afterRender,0));return result;};wrapped.__deleteWrapped=true;window[name]=wrapped;
+  }
+  function install(){wrap('render');wrap('home');wrap('refreshInicio');afterRender();const observer=new MutationObserver(()=>{if(Date.now()-lastRender>40)afterRender();});const c=document.getElementById('content');if(c)observer.observe(c,{childList:true,subtree:true});window.__CARTERA_DELETE_LAYER_VERSION__=VERSION;}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,50));else setTimeout(install,50);
+})();
