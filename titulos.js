@@ -8,16 +8,29 @@
     const st=document.createElement("style");st.id="titulos-inline-style";st.textContent=`
       #content .titulos-edit{width:100%;min-width:95px;box-sizing:border-box;border:1px solid transparent;background:transparent;border-radius:5px;padding:5px 6px;font:inherit;font-size:11px;color:inherit;outline:none;text-transform:uppercase}
       #content .titulos-edit:hover,#content .titulos-edit:focus{border-color:#8aa9bf;background:#fff;box-shadow:0 1px 3px #00000012}
-      #content .titulos-money{text-align:right;text-transform:none}.titulos-date{min-width:105px}.titulos-select{min-width:125px;cursor:pointer}.titulos-observacion{min-width:240px}#content td{vertical-align:middle}
+      #content .titulos-money{text-align:right;text-transform:none}.titulos-date{min-width:105px}.titulos-select{min-width:125px;cursor:pointer}.titulos-observacion{min-width:240px}
+      #content table.resizable-table.titulos-auto-fit{table-layout:auto}
+      #content table.resizable-table.titulos-auto-fit th.titulos-fit-col,#content table.resizable-table.titulos-auto-fit td.titulos-fit-col{white-space:nowrap;width:max-content}
+      #content table.resizable-table.titulos-auto-fit td.titulos-fit-col .titulos-edit{width:max-content;min-width:100%}
+      #content table.resizable-table.titulos-auto-fit th.titulos-fit-observacion,#content table.resizable-table.titulos-auto-fit td.titulos-fit-observacion{white-space:normal;width:max-content}
+      #content table.resizable-table.titulos-auto-fit td.titulos-fit-observacion .titulos-edit{width:max-content;min-width:240px;max-width:520px;white-space:normal}
+      #content td{vertical-align:middle}
     `;document.head.appendChild(st);
   }
   function tituloRadicacionOptions(current){const cur=String(current||"").trim().toUpperCase();return '<option value="">N/A</option>'+TITULO_RADICACION_OPTIONS.map(x=>'<option value="'+esc(x)+'" '+(cur===x?'selected':'')+'>'+esc(x)+'</option>').join("")}
+  function tituloDateTyping(value){
+    const digits=String(value??"").replace(/\D/g,"").slice(0,8);
+    if(digits.length<=2)return digits;
+    if(digits.length<=4)return digits.slice(0,2)+"/"+digits.slice(2);
+    if(digits.length===6)return digits.slice(0,2)+"/"+digits.slice(2,4)+"/20"+digits.slice(4);
+    return digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4,8);
+  }
   function safeInlineEdit(id,field,value,opts={}){
     const type=opts.type||"text",cls="titulos-edit "+(opts.className||"");
     if(type==="select")return '<select class="'+cls+' titulos-select" onchange="titulosUpdateField('+Number(id)+',\''+esc(field)+'\',this.value,this)">'+opts.options(value)+'</select>';
     const shown=type==="date"?displayDate(value):type==="money"?moneyInput(value):String(value??"");
     const placeholder=type==="date"?"DD/MM/AA":opts.placeholder||"";
-    return '<input class="'+cls+(type==="date"?' titulos-date':'')+(type==="money"?' titulos-money':'')+' type="text" value="'+esc(shown)+'" placeholder="'+esc(placeholder)+'" data-original="'+esc(shown)+'" '+(type==="date"?'inputmode="numeric" maxlength="10"':'')+' onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}" onblur="titulosUpdateField('+Number(id)+',\''+esc(field)+'\',this.value,this)" />';
+    return '<input class="'+cls+(type==="date"?' titulos-date':'')+(type==="money"?' titulos-money':'')+' type="text" value="'+esc(shown)+'" placeholder="'+esc(placeholder)+'" data-original="'+esc(shown)+'" '+(type==="date"?'inputmode="numeric" maxlength="10" oninput="this.value=tituloDateTyping(this.value)"':'')+' onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur()}" onblur="titulosUpdateField('+Number(id)+',\''+esc(field)+'\',this.value,this)" />';
   }
   window.titulosUpdateField=async function(id,field,value,control){
     const rec=(cache.titulos||[]).find(x=>Number(x.id)===Number(id));if(!rec)return;
@@ -39,12 +52,27 @@
   function titleRow(r){return [
     safeInlineEdit(r.id,"nit",r.nit,{placeholder:"NIT"}),safeInlineEdit(r.id,"razon_social",r.razon_social||r.contribuyente,{placeholder:"RAZÓN SOCIAL"}),safeInlineEdit(r.id,"tdj",r.tdj,{placeholder:"TDJ"}),safeInlineEdit(r.id,"fecha_tdj",r.fecha_tdj,{type:"date"}),safeInlineEdit(r.id,"valor",r.valor,{type:"money",placeholder:"$ 0"}),safeInlineEdit(r.id,"estado",r.estado,{type:"select",options:v=>statusOptions("titulos",v)}),safeInlineEdit(r.id,"tipo_radicacion",r.tipo_radicacion,{type:"select",options:tituloRadicacionOptions}),safeInlineEdit(r.id,"solicitud_radicado",r.solicitud_radicado,{placeholder:"RADICADO"}),safeInlineEdit(r.id,"fecha_tramite",r.fecha_tramite,{type:"date"}),safeInlineEdit(r.id,"observaciones",r.observaciones,{placeholder:"OBSERVACIONES",className:"titulos-observacion"})
   ]}
+  function applyTitulosAutoFit(){
+    const table=$("content")?.querySelector("table.resizable-table");if(!table)return;
+    table.classList.add("titulos-auto-fit");
+    const headers=Array.from(table.querySelectorAll("thead th"));
+    const fitKeys=new Set(["tdj","estado","tipo_radicacion","observaciones"]);
+    headers.forEach((th,index)=>{
+      const key=String(th.dataset?.key||th.getAttribute("data-key")||"").trim().toLowerCase();
+      if(!fitKeys.has(key))return;
+      th.classList.add(key==="observaciones"?"titulos-fit-observacion":"titulos-fit-col");
+      table.querySelectorAll("tbody tr").forEach(tr=>{
+        const td=tr.children[index];if(td)td.classList.add(key==="observaciones"?"titulos-fit-observacion":"titulos-fit-col");
+      });
+    });
+  }
   function listTitulos(){
     const raw=Array.isArray(cache.titulos)?cache.titulos:[],rows=sortRows("titulos",filterRows("titulos",raw));
     const headers=[["nit","NIT"],["razon_social","RAZÓN SOCIAL"],["tdj","TDJ"],["fecha_tdj","FECHA TDJ"],["valor","VALOR"],["estado","ESTADO"],["tipo_radicacion","TIPO RADICACIÓN"],["solicitud_radicado","NÚMERO RADICADO"],["fecha_tramite","FECHA TRÁMITE"],["observaciones","OBSERVACIONES"]];
     const head=headers.map(([k,h])=>sortHeader("titulos",k,h)).join(""),body=rows.map(r=>'<tr>'+titleRow(r).map(x=>'<td>'+x+'</td>').join("")+'</tr>').join("");
     $("content").innerHTML='<div class="toolbar"><button onclick="titulosOpenModal()">+ NUEVO</button><button class="alt" onclick="importXlsx(\'titulos\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\'titulos\')">EXPORTAR XLSX</button><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button></div><div class="tablewrap"><table class="resizable-table"><thead><tr>'+head+'</tr></thead><tbody>'+(body||'<tr><td colspan="10" class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</td></tr>')+'</tbody></table></div>';
     bindColumnResize($("content"),"titulos");
+    applyTitulosAutoFit();
   }
   function modalField(label,name,value,type){const v=String(value??"");if(type==="date")return '<label>'+label+'<div class="date-control"><input name="'+name+'" class="date-field" type="text" inputmode="numeric" maxlength="10" value="'+esc(displayDate(v))+'" placeholder="DD-MM-AA"><input class="date-picker" type="date" value="'+esc(v.slice(0,10))+'"></div></label>';if(type==="money")return '<label>'+label+'<input name="'+name+'" class="money-field" type="text" inputmode="numeric" value="'+esc(moneyInput(value))+'" placeholder="$ 0"></label>';if(type==="select")return '<label>'+label+'<select name="'+name+'">'+tituloRadicacionOptions(v)+'</select></label>';if(type==="status")return '<label>'+label+'<select name="'+name+'">'+statusOptions("titulos",v)+'</select></label>';if(type==="textarea")return '<label>'+label+'<textarea name="'+name+'" class="upper-field">'+esc(v)+'</textarea></label>';return '<label>'+label+'<input name="'+name+'" class="upper-field" type="text" value="'+esc(v)+'"></label>'}
   window.titulosOpenModal=async function(id){
