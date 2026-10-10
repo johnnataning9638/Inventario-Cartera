@@ -37,7 +37,6 @@
     };
     if(!document.getElementById('actuaciones-performance-20261010-5')){
       const s=document.createElement('style');s.id='actuaciones-performance-20261010-5';s.textContent=`
-        #content .actuaciones-expedientes-table{contain:layout paint style;content-visibility:auto;}
         #content .actuaciones-expedientes-table tbody tr{content-visibility:auto;contain-intrinsic-size:32px;}
         #content .actuaciones-expedientes-table tbody td{contain:style paint;}
         #content .actuaciones-expedientes-table .ax-display{contain:paint style;}
