@@ -6,68 +6,33 @@
   let cacheRevision=0, rowsCacheKey='', rowsCache=null, dataSignature='';
   function isActuaciones(){return String(window.view||'').toLowerCase()===TYPE||String(document.getElementById('title')?.textContent||'').trim().toUpperCase()==='ACTUACIONES / EXPEDIENTES';}
   function norm(v){return String(v??'').trim().toLowerCase();}
-  function tramite(r){
-    if(r?.fecha_desembargo)return 'DESEMBARGADO';
-    if(r?.fecha_mandamiento_pago)return 'MANDAMIENTO DE PAGO';
-    if(r?.fecha_investigacion_bienes)return 'INVESTIGACIÓN DE BIENES';
-    if(r?.fecha_embargo)return 'EMBARGADO';
-    if(r?.fecha_opp)return 'OPP';
-    if(r?.fecha_aviso_cobro)return 'AVISO DE COBRO';
-    return null;
-  }
+  function tramite(r){if(r?.fecha_desembargo)return 'DESEMBARGADO';if(r?.fecha_mandamiento_pago)return 'MANDAMIENTO DE PAGO';if(r?.fecha_investigacion_bienes)return 'INVESTIGACIÓN DE BIENES';if(r?.fecha_embargo)return 'EMBARGADO';if(r?.fecha_opp)return 'OPP';if(r?.fecha_aviso_cobro)return 'AVISO DE COBRO';return null;}
   function refreshLocalTramite(r){if(!r)return;const next=tramite(r);if(r.tramite_en_curso!==next)r.tramite_en_curso=next;}
-  function rebuildSearchIndex(){
-    const rows=Array.isArray(cache.actuaciones)?cache.actuaciones:[];
-    for(const r of rows){r.__ax_search=SEARCH_KEYS.map(k=>norm(r?.[k])).filter(Boolean).join(' | ');refreshLocalTramite(r);}
-    dataSignature=rows.length+':'+String(rows[0]?.id||'')+':'+String(rows[rows.length-1]?.id||'');
-    rowsCacheKey='';rowsCache=null;cacheRevision++;
-  }
-  function ensureData(){
-    const rows=Array.isArray(cache.actuaciones)?cache.actuaciones:[];
-    const sig=rows.length+':'+String(rows[0]?.id||'')+':'+String(rows[rows.length-1]?.id||'');
-    if(sig!==dataSignature)rebuildSearchIndex();
-  }
+  function rebuildSearchIndex(){const rows=Array.isArray(cache.actuaciones)?cache.actuaciones:[];for(const r of rows){r.__ax_search=SEARCH_KEYS.map(k=>norm(r?.[k])).filter(Boolean).join(' | ');refreshLocalTramite(r);}dataSignature=rows.length+':'+String(rows[0]?.id||'')+':'+String(rows[rows.length-1]?.id||'');rowsCacheKey='';rowsCache=null;cacheRevision++;}
+  function ensureData(){const rows=Array.isArray(cache.actuaciones)?cache.actuaciones:[];const sig=rows.length+':'+String(rows[0]?.id||'')+':'+String(rows[rows.length-1]?.id||'');if(sig!==dataSignature)rebuildSearchIndex();}
   function searchRows(rows,q){const needle=norm(q);if(!needle)return rows;return rows.filter(r=>String(r.__ax_search||'').includes(needle));}
-  function getRows(){
-    ensureData();
-    const rows=cache.actuaciones||[],q=String(document.getElementById('search')?.value||'').trim(),filters=tableState[TYPE]?.filters||{},st=tableState[TYPE]||{};
-    const key=q+'|'+JSON.stringify(filters)+'|'+String(st.sortKey||'')+'|'+String(st.asc!==false)+'|'+cacheRevision;
-    if(key===rowsCacheKey&&rowsCache)return rowsCache;
-    let out=searchRows(rows,q);out=filterRows(TYPE,out);out=sortRows(TYPE,out);rowsCacheKey=key;rowsCache=out;return out;
-  }
+  function getRows(){ensureData();const rows=cache.actuaciones||[],q=String(document.getElementById('search')?.value||'').trim(),filters=tableState[TYPE]?.filters||{},st=tableState[TYPE]||{};const key=q+'|'+JSON.stringify(filters)+'|'+String(st.sortKey||'')+'|'+String(st.asc!==false)+'|'+cacheRevision;if(key===rowsCacheKey&&rowsCache)return rowsCache;let out=searchRows(rows,q);out=filterRows(TYPE,out);out=sortRows(TYPE,out);rowsCacheKey=key;rowsCache=out;return out;}
   function display(r,key,type){const v=r?.[key];if(v===null||v===undefined||v==='')return '';if(type==='currency')return money(v);if(type==='date')return displayDate(v);return String(v);}
-  function fastRow(r,F){return '<tr data-ax-row="'+Number(r.id)+'">'+F.map(([key,label,type])=>{const value=display(r,key,type),cls=type==='currency'?' class="ax-fast-money"':type==='textarea'?' class="ax-fast-observation"':'';return '<td data-ax-cell="'+esc(key)+'"'+cls+' title="'+esc(value)+'">'+esc(value)+'</td>';}).join('')+'</tr>';}
+  function fastRow(r,F){return '<tr data-ax-row="'+Number(r.id)+'">'+F.map(([key,label,type])=>{const value=display(r,key,type),cls=type==='currency'?' class="ax-fast-money"':type==='textarea'?' class="ax-fast-observation"':key==='tramite_en_curso'?' class="ax-fast-derived"':'';return '<td data-ax-cell="'+esc(key)+'"'+cls+' title="'+esc(value)+'">'+esc(value)+'</td>';}).join('')+'</tr>';}
   function listFast(type){
     if(type!==TYPE)return false;
     const F=[['nit','NIT','text'],['razon_social','RAZÓN SOCIAL','text'],['expediente','EXPEDIENTE','text'],['cuantia','CUANTÍA','currency'],['ano','AÑO','text'],['periodo','PERÍODO','text'],['obligacion','OBLIGACIÓN','select'],['tipo_obl','TIPO OBL','select'],['fecha_prescripcion','FECHA PRESCRIPCIÓN','date'],['aplicativo','APLICATIVO','select'],['estado','ESTADO','select'],['estado_sipac','ESTADO SIPAC','select'],['tramite_en_curso','TRÁMITE EN CURSO','text'],['fecha_aviso_cobro','FECHA AVISO COBRO','date'],['fecha_opp','FECHA OPP','date'],['fecha_embargo','FECHA EMBARGO','date'],['fecha_desembargo','FECHA DESEMBARGO','date'],['fecha_investigacion_bienes','FECHA INVESTIGACIÓN BIENES','date'],['fecha_mandamiento_pago','FECHA MANDAMIENTO PAGO','date'],['observaciones','OBSERVACIONES','textarea']];
     const rows=getRows(),sortNote=tableState[type]?.sortKey?'<span class="sort-note">ORDEN: '+esc(String(tableState[type].sortKey).toUpperCase())+' '+(tableState[type].asc?'ASCENDENTE':'DESCENDENTE')+'</span>':'',q=String(document.getElementById('search')?.value||'').trim(),searchNote=q?'<span class="sort-note">BUSCANDO: '+esc(q.toUpperCase())+'</span>':'';
     const html='<div class="toolbar"><button onclick="openModal(\'actuaciones\')">+ NUEVO</button><button class="alt" onclick="importXlsx(\'actuaciones\')">IMPORTAR XLSX</button><button class="alt" onclick="exportXlsx(\'actuaciones\')">EXPORTAR XLSX</button><button class="alt clear-filters-btn" onclick="clearAllFilters()">LIMPIAR FILTROS</button>'+sortNote+searchNote+'</div><div class="tablewrap"><table class="resizable-table actuaciones-expedientes-table ax-fast"><thead><tr>'+F.map(([k,l])=>sortHeader(TYPE,k,l)).join('')+'</tr></thead><tbody>'+(rows.length?rows.map(r=>fastRow(r,F)).join(''):'<tr><td colspan="20" class="empty">NO HAY REGISTROS PARA EL FILTRO ACTUAL</td></tr>')+'</tbody></table></div>';
     $('content').innerHTML=html;
+    $('content').querySelectorAll('td[data-ax-cell="tramite_en_curso"]').forEach(td=>td.dataset.axBound='1');
     if(typeof bindCellEditing==='function')bindCellEditing($('content'));
     if(typeof bindColumnResize==='function')bindColumnResize($('content'),TYPE);
     const table=$('content').querySelector('table');
     if(dataSignature!==window.__AX_WIDTH_DATA_SIGNATURE__){if(typeof fitColumns==='function')fitColumns($('content'));window.__AX_WIDTH_DATA_SIGNATURE__=dataSignature;}else if(table&&typeof applySavedColumnWidths==='function')applySavedColumnWidths(table,'actuaciones');
     return true;
   }
-  const nativeList=window.list;
-  window.list=function(type){if(type===TYPE)return listFast(type);return nativeList.apply(this,arguments);};
+  const nativeList=window.list;window.list=function(type){if(type===TYPE)return listFast(type);return nativeList.apply(this,arguments);};
   function updateTramiteCell(r){const tr=document.querySelector('tr[data-ax-row="'+Number(r.id)+'"]');if(!tr)return;const td=tr.querySelector('td[data-ax-cell="tramite_en_curso"]');if(td){td.textContent=r.tramite_en_curso||'';td.title=r.tramite_en_curso||'';}}
-  function syncDateFromEditor(editor){
-    if(!editor||!editor.closest('td[data-ax-cell]'))return;
-    const cell=editor.closest('td[data-ax-cell]'),key=cell.dataset.axCell;if(!DATE_KEYS.includes(key))return;
-    const tr=cell.closest('tr[data-ax-row]');if(!tr)return;const r=(cache.actuaciones||[]).find(x=>Number(x.id)===Number(tr.dataset.axRow));if(!r)return;
-    const parsed=typeof isoFromDateInput==='function'?isoFromDateInput(editor.value):null;r[key]=parsed;refreshLocalTramite(r);updateTramiteCell(r);rowsCacheKey='';
-  }
-  function bindDateResponsiveness(){
-    if(document.documentElement.dataset.axUltraDates==='1')return;document.documentElement.dataset.axUltraDates='1';
-    document.addEventListener('input',e=>{if(e.target?.matches?.('input.ax-cell-date'))syncDateFromEditor(e.target);},true);
-    document.addEventListener('change',e=>{if(e.target?.matches?.('input.ax-cell-date'))syncDateFromEditor(e.target);},true);
-    document.addEventListener('focusout',e=>{if(e.target?.matches?.('input.ax-cell-date'))syncDateFromEditor(e.target);},true);
-  }
-  function install(){
-    if(window.__ACTUACIONES_ULTRA_20261010_7__)return;bindDateResponsiveness();
-    const oldRender=window.render;if(typeof oldRender==='function')window.render=function(){if(isActuaciones())ensureData();return oldRender.apply(this,arguments);};
-    window.__ACTUACIONES_ULTRA_20261010_7__=true;window.__ACTUACIONES_ULTRA_VERSION__='20261010.7';
-  }
+  function syncDateFromEditor(editor){if(!editor||!editor.closest('td[data-ax-cell]'))return;const cell=editor.closest('td[data-ax-cell]'),key=cell.dataset.axCell;if(!DATE_KEYS.includes(key))return;const tr=cell.closest('tr[data-ax-row]');if(!tr)return;const r=(cache.actuaciones||[]).find(x=>Number(x.id)===Number(tr.dataset.axRow));if(!r)return;const parsed=typeof isoFromDateInput==='function'?isoFromDateInput(editor.value):null;r[key]=parsed;refreshLocalTramite(r);updateTramiteCell(r);rowsCacheKey='';}
+  function syncSearchIndexFromEditor(editor){const cell=editor?.closest?.('td[data-ax-cell]');if(!cell||!SEARCH_KEYS.includes(cell.dataset.axCell))return;const tr=cell.closest('tr[data-ax-row]');if(!tr)return;const r=(cache.actuaciones||[]).find(x=>Number(x.id)===Number(tr.dataset.axRow));if(!r)return;r.__ax_search=SEARCH_KEYS.map(k=>norm(r?.[k])).filter(Boolean).join(' | ');rowsCacheKey='';}
+  function bindResponsiveness(){if(document.documentElement.dataset.axUltraEvents==='1')return;document.documentElement.dataset.axUltraEvents='1';document.addEventListener('input',e=>{if(e.target?.matches?.('input.ax-cell-date'))syncDateFromEditor(e.target);if(e.target?.matches?.('.ax-cell-edit'))syncSearchIndexFromEditor(e.target);},true);document.addEventListener('change',e=>{if(e.target?.matches?.('input.ax-cell-date'))syncDateFromEditor(e.target);if(e.target?.matches?.('.ax-cell-edit'))syncSearchIndexFromEditor(e.target);},true);document.addEventListener('focusout',e=>{if(e.target?.matches?.('input.ax-cell-date'))syncDateFromEditor(e.target);if(e.target?.matches?.('.ax-cell-edit'))syncSearchIndexFromEditor(e.target);},true);}
+  function protectModal(){const original=window.openModal;if(typeof original!=='function'||original.__axUltraModal)return;const wrapped=function(...args){const out=original.apply(this,args);if(String(args[0]||'').toLowerCase()===TYPE){const field=document.querySelector('#mform [name="tramite_en_curso"]');if(field){field.readOnly=true;field.title='CAMPO AUTOMÁTICO SEGÚN LAS FECHAS DEL PROCESO';field.style.background='#eef4f8';}}return out;};wrapped.__axUltraModal=true;window.openModal=wrapped;}
+  function install(){if(window.__ACTUACIONES_ULTRA_20261010_7__)return;bindResponsiveness();protectModal();const oldRender=window.render;if(typeof oldRender==='function')window.render=function(){if(isActuaciones())ensureData();return oldRender.apply(this,arguments);};window.__ACTUACIONES_ULTRA_20261010_7__=true;window.__ACTUACIONES_ULTRA_VERSION__='20261010.7';}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(install,260));else setTimeout(install,260);
 })();
